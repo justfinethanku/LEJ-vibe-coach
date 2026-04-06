@@ -4,6 +4,8 @@
 
 Adapt Vibe Coach to a user’s repo quickly and cleanly.
 
+Read [`AGENTS.md`](../AGENTS.md) first.
+
 ## Workflow
 
 ### 1. Gather repo context
@@ -15,6 +17,7 @@ Read:
 - architecture docs
 - core source directories
 - issue tracker or roadmap docs if available
+- the structured blueprint in [`vibe-coach.project.ts`](../vibe-coach.project.ts)
 
 Output:
 
@@ -58,9 +61,7 @@ The lesson plan should:
 
 Run:
 
-- `npm run db:sync`
-- `npm run lint`
-- `npm run build`
+- `npm run verify`
 
 Then open the app and verify:
 

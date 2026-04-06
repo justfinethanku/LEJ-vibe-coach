@@ -47,3 +47,17 @@ The important shift is architectural:
 - add a curriculum generation pipeline
 - add learner-profile and concept-gap views
 - make the lesson seed process easier for AI to rewrite automatically
+
+### Clean repo bootstrap
+
+- Moved the working prototype into its own clean git repository.
+- Pulled the example research pack into the repo so the app is self-contained.
+- Fixed runtime pathing so research imports resolve from the repo root.
+- Replaced machine-specific doc links with repo-relative links.
+
+### Reuse logistics
+
+- Added a `verify` script so AI or humans can validate the baseline in one command.
+- Added a repo-level `AGENTS.md` contract for future AI adaptation work.
+- Expanded [`vibe-coach.project.ts`](../vibe-coach.project.ts) with an explicit adaptation blueprint.
+- Added a full automation loop doc to keep the next product phase grounded.

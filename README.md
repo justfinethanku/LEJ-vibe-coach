@@ -43,8 +43,10 @@ This repo is meant to become a reusable schema, not just a single curriculum.
 
 The adaptation surface is:
 
+- [`AGENTS.md`](./AGENTS.md)
+  The repo-level instructions another AI should follow when adapting Vibe Coach.
 - [`vibe-coach.project.ts`](./vibe-coach.project.ts)
-  The project context file an AI should rewrite for a new repo.
+  The project context file plus the structured adaptation blueprint for a new repo.
 - [`server/content.ts`](./server/content.ts)
   The current lesson and quiz seed definitions.
 - [`server/db.ts`](./server/db.ts)
@@ -53,6 +55,8 @@ The adaptation surface is:
   The repo contract for reuse.
 - [`docs/ai-builder-playbook.md`](./docs/ai-builder-playbook.md)
   The step-by-step instructions an AI should follow when adapting Vibe Coach to a user’s repo.
+- [`docs/full-automation-loop.md`](./docs/full-automation-loop.md)
+  The target end-to-end workflow from repo inspection to personalized lesson updates.
 
 ## Current Stack
 
@@ -86,6 +90,8 @@ Why this stack:
   Starts the Vite frontend and Express API together.
 - `npm run build`
   Type-checks and builds the frontend.
+- `npm run verify`
+  Runs the full baseline validation pass: DB sync, lint, and build.
 - `npm run serve`
   Serves the built frontend through the Express app.
 - `npm run db:sync`
@@ -110,3 +116,13 @@ V1 does not yet automatically:
 - rewrite future lessons from comments
 
 What it does do is put the right system boundaries in place so those features can be added without redesigning the whole app.
+
+## Adapting To Another Repo
+
+The intended adaptation loop is:
+
+1. Read [`AGENTS.md`](./AGENTS.md) and [`vibe-coach.project.ts`](./vibe-coach.project.ts).
+2. Inspect the target repo and write project-specific research into `research/...`.
+3. Update the project context and lesson seed content.
+4. Run `npm run verify`.
+5. Use learner comments and quiz history to refine later lessons.

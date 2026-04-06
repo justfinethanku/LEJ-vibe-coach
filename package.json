@@ -12,7 +12,8 @@
     "db:reset": "tsx server/reset-db.ts",
     "db:sync": "tsx server/sync-db.ts",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "verify": "npm run db:sync && npm run lint && npm run build"
   },
   "dependencies": {
     "better-sqlite3": "^12.8.0",

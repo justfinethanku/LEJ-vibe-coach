@@ -23,6 +23,8 @@ An AI should be able to enter a repo and produce the first useful Vibe Coach set
 
 Includes:
 
+- repo-level AI instructions and adaptation contract
+- structured project blueprint for inspection and curriculum framing
 - repo inspection workflow
 - research doc generation
 - project context updates

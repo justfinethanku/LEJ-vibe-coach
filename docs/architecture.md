@@ -34,6 +34,7 @@ It owns:
 - the project title and description
 - where research lives
 - the initial learning track metadata
+- the AI adaptation blueprint
 - eventually, AI-generated curriculum material
 
 That context currently lives in [`vibe-coach.project.ts`](../vibe-coach.project.ts).
@@ -191,5 +192,6 @@ It is:
 - an AI research pipeline that reads a repo and writes the research docs
 - a curriculum generation pipeline that drafts lessons from that research
 - a revision loop that uses learner comments and quiz misses to improve later lessons
+- a repo-level AI contract in [`AGENTS.md`](../AGENTS.md) that keeps those steps explicit
 
 That is the open-source direction that makes Vibe Coach broadly useful.
