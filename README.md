@@ -1,144 +1,145 @@
 # Vibe Coach
 
-The educational platform that teaches you while you build.
+<p align="center">
+  <img src="./assets/vibe-coach-hero.svg" alt="Vibe Coach hero" width="100%" />
+</p>
 
-Vibe Coach is a local-first open-source schema for turning repo context into:
+<p align="center">
+  <a href="./LICENSE"><img src="https://img.shields.io/badge/License-MIT-0F172A?style=flat-square" alt="MIT License" /></a>
+  <a href="./CONTRIBUTING.md"><img src="https://img.shields.io/badge/Contributions-Welcome-F59E0B?style=flat-square" alt="Contributions welcome" /></a>
+  <img src="https://img.shields.io/badge/Mode-.vibe--coach-0F766E?style=flat-square" alt="Embedded mode" />
+  <img src="https://img.shields.io/badge/Runtime-Local--First-EA580C?style=flat-square" alt="Local first" />
+  <img src="https://img.shields.io/badge/Stack-React%20%2B%20SQLite-2563EB?style=flat-square" alt="React and SQLite" />
+  <img src="https://img.shields.io/badge/Agents-Capable%20AI%20Required-7C3AED?style=flat-square" alt="Capable AI required" />
+</p>
 
-- structured research
-- a project-specific lesson path
-- quizzes and progress tracking
-- learner comments that personalize future lessons
+<p align="center">
+  The educational platform that teaches you while you build.
+</p>
 
-The current seeded example in this repo is the `Local AI Coding Harness` project, but the codebase is now organized so an AI can adapt it to a different repo quickly.
+Vibe Coach turns a repo into a living course.
 
-## Quick Start
+You paste one prompt into a capable coding agent. The agent installs Vibe Coach into `./.vibe-coach/`, researches the host repo, writes a lesson path, seeds quizzes, and leaves behind a repo-local learning layer that future humans and agents can keep improving.
 
-1. Install dependencies with `npm install`.
-2. Seed the local SQLite database with `npm run db:sync`.
-3. Start the app with `npm run dev`.
-4. Open `http://localhost:5173` in the browser.
+## Why This Exists
 
-## Dead-Simple Adoption
+Most onboarding docs are stale, generic, or disconnected from the code.
 
-The intended end-user flow is:
+Vibe Coach takes a different approach:
 
-1. open your project in a capable coding agent
-2. copy the bootstrap prompt from [`prompts/bootstrap-into-current-repo.md`](./prompts/bootstrap-into-current-repo.md)
-3. paste it into the agent
-4. let the agent install Vibe Coach into `./.vibe-coach/`
-
-After that first run, the repo should contain a reusable Vibe Coach layer that future agents can pick up and continue.
-
-## Core Product Idea
-
-Drop Vibe Coach into a repo.
-
-Then an AI should be able to:
-
-1. inspect the repo, docs, and project context
-2. write research into markdown and import it into SQLite
-3. generate a progressive lesson plan based on that research
-4. collect learner notes and quiz performance
-5. refine future lessons around what the learner still does not understand
+- research is stored as inspectable markdown
+- lessons and quizzes are generated from that research
+- learner comments and quiz results become feedback for the next pass
+- the learning layer lives inside the repo it teaches
 
 That makes it useful for:
 
-- onboarding new engineers or collaborators
-- learning unfamiliar domains while building
-- starting greenfield projects outside your comfort zone
-- preserving the reasoning behind a project as it evolves
+- onboarding new collaborators
+- learning a codebase outside your domain
+- preserving architectural reasoning as a project evolves
+- giving future agents persistent context that survives the chat window
 
-## Repo Shape
+## How It Works
 
-This repo is meant to become a reusable schema, not just a single curriculum.
+<p align="center">
+  <img src="./assets/vibe-coach-workflow.svg" alt="Vibe Coach workflow" width="100%" />
+</p>
 
-The adaptation surface is:
+## Dead-Simple Adoption
 
-- [`AGENTS.md`](./AGENTS.md)
-  The repo-level instructions another AI should follow when adapting Vibe Coach.
-- [`vibe-coach.project.ts`](./vibe-coach.project.ts)
-  The project context file plus the structured adaptation blueprint for a new repo.
-- [`server/content.ts`](./server/content.ts)
-  The current lesson and quiz seed definitions.
-- [`server/db.ts`](./server/db.ts)
-  The import, persistence, progress, and personalization storage layer.
-- [`docs/repo-schema.md`](./docs/repo-schema.md)
-  The repo contract for reuse.
-- [`docs/ai-builder-playbook.md`](./docs/ai-builder-playbook.md)
-  The step-by-step instructions an AI should follow when adapting Vibe Coach to a user’s repo.
-- [`docs/full-automation-loop.md`](./docs/full-automation-loop.md)
-  The target end-to-end workflow from repo inspection to personalized lesson updates.
-- [`docs/embedded-install-mode.md`](./docs/embedded-install-mode.md)
-  The install model for embedding Vibe Coach into `./.vibe-coach/` inside another repo.
-- [`prompts`](./prompts)
-  Copy-paste prompt entrypoints for capable coding agents.
+The intended flow is:
 
-## Current Stack
+1. Open your project in Claude Code, Codex, Cursor, or another capable coding agent.
+2. Copy the prompt from [`prompts/bootstrap-into-current-repo.md`](./prompts/bootstrap-into-current-repo.md).
+3. Paste it into the agent.
+4. Let the agent install Vibe Coach into `./.vibe-coach/`.
+5. Open Vibe Coach in the browser and start learning your actual project.
 
-- React + Vite for the browser UI
-- Express for the local API
-- `better-sqlite3` for the database
-- Markdown as the human-editable source material
+The refresh flow lives in [`prompts/refresh-current-repo.md`](./prompts/refresh-current-repo.md).
 
-Why this stack:
+## What Gets Installed
 
-- local-first
-- inspectable
-- easy for one person to operate
-- easy for AI to patch without a lot of framework ceremony
+Inside a host repo, Vibe Coach is meant to live at:
 
-## Current Runtime Files
+- `./.vibe-coach/`
 
-- App code: [`src`](./src)
-- Server and DB bootstrap: [`server`](./server)
-- Project context config: [`vibe-coach.project.ts`](./vibe-coach.project.ts)
-- Example research pack: [`research/2026-04-06-local-ai-coding-harness`](./research/2026-04-06-local-ai-coding-harness)
-- SQLite database path: `data/vibe-coach.sqlite`
-- Architecture notes: [`docs/architecture.md`](./docs/architecture.md)
-- Implementation log: [`docs/implementation-log.md`](./docs/implementation-log.md)
-- Open-source product direction: [`docs/product-vision.md`](./docs/product-vision.md)
-- Roadmap: [`docs/open-source-roadmap.md`](./docs/open-source-roadmap.md)
+Shared artifacts that belong in git:
+
+- `./.vibe-coach/AGENTS.md`
+- `./.vibe-coach/vibe-coach.project.ts`
+- `./.vibe-coach/research/...`
+- `./.vibe-coach/server/content.ts`
+- `./.vibe-coach/docs/...`
+- the reusable engine code
+
+Local-only artifacts that should stay uncommitted:
+
+- `./.vibe-coach/data/*.sqlite`
+- `./.vibe-coach/data/*.sqlite-shm`
+- `./.vibe-coach/data/*.sqlite-wal`
+
+That split lets teams share the teaching system while each developer keeps personal quiz history, comments, and progress local.
+
+## Quick Start For This Repo
+
+1. Install dependencies with `npm install`.
+2. Seed the database with `npm run db:sync`.
+3. Start the app with `npm run dev`.
+4. Open `http://localhost:5173`.
 
 ## Scripts
 
 - `npm run dev`
   Starts the Vite frontend and Express API together.
+- `npm run verify`
+  Runs the baseline validation pass: DB sync, lint, and build.
 - `npm run build`
   Type-checks and builds the frontend.
-- `npm run verify`
-  Runs the full baseline validation pass: DB sync, lint, and build.
 - `npm run serve`
   Serves the built frontend through the Express app.
 - `npm run db:sync`
-  Synchronizes the SQLite database with the current research and lesson content.
+  Synchronizes SQLite with the current research and curriculum.
 - `npm run db:reset`
-  Deletes the SQLite file and recreates it from seed data.
+  Recreates the database from seed data.
 
-## What Is Already Working
+## Current Product Boundary
 
-- Research browsing
-- Progressive lesson navigation
-- Quiz scoring and history
-- Confidence and completion tracking
-- Lesson comments as teaching signals
+Already working:
 
-## What Is Not Automated Yet
+- research browsing
+- progressive lesson navigation
+- quiz scoring and history
+- confidence and completion tracking
+- learner comments as teaching signals
+- embedded install prompts for capable agents
 
-V1 does not yet automatically:
+Not automated yet:
 
-- research a repo on its own
-- generate lesson seeds from research without code changes
-- rewrite future lessons from comments
+- autonomous repo research without a bootstrap prompt
+- autonomous curriculum generation without editing `server/content.ts`
+- automatic lesson rewrites from learner feedback
 
-What it does do is put the right system boundaries in place so those features can be added without redesigning the whole app.
+That is intentional. The repo is biased toward inspectability over AI magic.
 
-## Adapting To Another Repo
+## Important Files
 
-The intended adaptation loop is:
+- [`AGENTS.md`](./AGENTS.md)
+  The repo-level instructions another AI should follow.
+- [`vibe-coach.project.ts`](./vibe-coach.project.ts)
+  Project context, embedded install rules, and the adaptation blueprint.
+- [`docs/embedded-install-mode.md`](./docs/embedded-install-mode.md)
+  The install shape for embedding Vibe Coach into another repo.
+- [`docs/full-automation-loop.md`](./docs/full-automation-loop.md)
+  The target end-to-end product workflow.
+- [`docs/repo-schema.md`](./docs/repo-schema.md)
+  The repo contract for reuse.
+- [`docs/ai-builder-playbook.md`](./docs/ai-builder-playbook.md)
+  The practical adaptation workflow.
+- [`prompts`](./prompts)
+  Copy-paste entrypoints for capable coding agents.
 
-1. Install Vibe Coach into `./.vibe-coach/` inside the host repo.
-2. Read [`AGENTS.md`](./AGENTS.md) and [`vibe-coach.project.ts`](./vibe-coach.project.ts).
-3. Inspect the host repo and write project-specific research into `./.vibe-coach/research/...`.
-4. Update the project context and lesson seed content.
-5. Run `npm run verify`.
-6. Use learner comments and quiz history to refine later lessons.
+## Open Source
+
+Vibe Coach is released under the [MIT License](./LICENSE).
+
+If you want to contribute, start with [CONTRIBUTING.md](./CONTRIBUTING.md).

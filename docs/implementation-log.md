@@ -68,3 +68,10 @@ The important shift is architectural:
 - Added explicit embedded-install metadata in [`vibe-coach.project.ts`](../vibe-coach.project.ts).
 - Added a prompt library for first-time install and refresh flows.
 - Documented the shareable-versus-local artifact split so teams can commit the teaching layer without committing personal learner state.
+
+### Open-source launch polish
+
+- Added the MIT License for a permissive launch posture.
+- Added [`CONTRIBUTING.md`](../CONTRIBUTING.md) so contributors know how to work on the project.
+- Rebuilt the README as a launch-ready front page with badges, a stronger product pitch, and visual assets.
+- Added branded SVG visuals in `assets/` for the repo hero and the core workflow.

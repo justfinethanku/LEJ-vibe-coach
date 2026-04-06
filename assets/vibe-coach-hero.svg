@@ -1,0 +1,60 @@
+<svg width="1400" height="760" viewBox="0 0 1400 760" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1400" height="760" rx="32" fill="#F8F4EC"/>
+  <rect x="36" y="36" width="1328" height="688" rx="28" fill="#FFFDF8" stroke="#0F172A" stroke-width="2"/>
+  <circle cx="1222" cy="144" r="132" fill="#F59E0B" fill-opacity="0.16"/>
+  <circle cx="1088" cy="602" r="150" fill="#0F766E" fill-opacity="0.14"/>
+  <circle cx="222" cy="144" r="92" fill="#FB923C" fill-opacity="0.14"/>
+
+  <rect x="84" y="88" width="148" height="38" rx="19" fill="#0F172A"/>
+  <text x="110" y="113" fill="#F8F4EC" font-size="18" font-weight="700" font-family="Arial, Helvetica, sans-serif">VIBE COACH</text>
+
+  <text x="84" y="202" fill="#0F172A" font-size="72" font-weight="800" font-family="Arial, Helvetica, sans-serif">Teaches you while</text>
+  <text x="84" y="278" fill="#0F172A" font-size="72" font-weight="800" font-family="Arial, Helvetica, sans-serif">you build the thing.</text>
+
+  <text x="84" y="336" fill="#334155" font-size="28" font-weight="500" font-family="Arial, Helvetica, sans-serif">
+    Paste one prompt into a capable coding agent.
+  </text>
+  <text x="84" y="374" fill="#334155" font-size="28" font-weight="500" font-family="Arial, Helvetica, sans-serif">
+    It installs into .vibe-coach, researches the repo, writes lessons,
+  </text>
+  <text x="84" y="412" fill="#334155" font-size="28" font-weight="500" font-family="Arial, Helvetica, sans-serif">
+    and leaves behind a living learning layer for the next person.
+  </text>
+
+  <rect x="84" y="476" width="360" height="168" rx="24" fill="#0F172A"/>
+  <text x="112" y="518" fill="#F8F4EC" font-size="18" font-weight="700" font-family="Courier New, monospace">$ paste bootstrap prompt</text>
+  <text x="112" y="558" fill="#FDBA74" font-size="18" font-weight="700" font-family="Courier New, monospace">&gt; install ./.vibe-coach</text>
+  <text x="112" y="592" fill="#5EEAD4" font-size="18" font-weight="700" font-family="Courier New, monospace">&gt; inspect host repo</text>
+  <text x="112" y="626" fill="#93C5FD" font-size="18" font-weight="700" font-family="Courier New, monospace">&gt; generate research + lessons</text>
+
+  <rect x="568" y="118" width="712" height="524" rx="28" fill="#FFF7ED" stroke="#FB923C" stroke-width="2"/>
+
+  <rect x="612" y="166" width="280" height="144" rx="20" fill="#FFFFFF" stroke="#0F172A" stroke-width="2"/>
+  <text x="640" y="208" fill="#0F172A" font-size="30" font-weight="800" font-family="Arial, Helvetica, sans-serif">Research Vault</text>
+  <text x="640" y="246" fill="#475569" font-size="20" font-weight="500" font-family="Arial, Helvetica, sans-serif">Repo map</text>
+  <text x="640" y="274" fill="#475569" font-size="20" font-weight="500" font-family="Arial, Helvetica, sans-serif">Architecture notes</text>
+  <text x="640" y="302" fill="#475569" font-size="20" font-weight="500" font-family="Arial, Helvetica, sans-serif">Operational guidance</text>
+
+  <rect x="956" y="166" width="280" height="144" rx="20" fill="#0F172A"/>
+  <text x="984" y="208" fill="#F8F4EC" font-size="30" font-weight="800" font-family="Arial, Helvetica, sans-serif">Lesson Path</text>
+  <text x="984" y="246" fill="#CBD5E1" font-size="20" font-weight="500" font-family="Arial, Helvetica, sans-serif">Foundations first</text>
+  <text x="984" y="274" fill="#CBD5E1" font-size="20" font-weight="500" font-family="Arial, Helvetica, sans-serif">Systems next</text>
+  <text x="984" y="302" fill="#CBD5E1" font-size="20" font-weight="500" font-family="Arial, Helvetica, sans-serif">Advanced tradeoffs later</text>
+
+  <rect x="612" y="344" width="280" height="144" rx="20" fill="#0F766E"/>
+  <text x="640" y="386" fill="#ECFEFF" font-size="30" font-weight="800" font-family="Arial, Helvetica, sans-serif">Quizzes + Notes</text>
+  <text x="640" y="424" fill="#CCFBF1" font-size="20" font-weight="500" font-family="Arial, Helvetica, sans-serif">Confidence tracking</text>
+  <text x="640" y="452" fill="#CCFBF1" font-size="20" font-weight="500" font-family="Arial, Helvetica, sans-serif">Comment feedback</text>
+  <text x="640" y="480" fill="#CCFBF1" font-size="20" font-weight="500" font-family="Arial, Helvetica, sans-serif">Concept gaps over time</text>
+
+  <rect x="956" y="344" width="280" height="144" rx="20" fill="#FFEDD5" stroke="#0F172A" stroke-width="2"/>
+  <text x="984" y="386" fill="#0F172A" font-size="30" font-weight="800" font-family="Arial, Helvetica, sans-serif">Shared by Default</text>
+  <text x="984" y="424" fill="#475569" font-size="20" font-weight="500" font-family="Arial, Helvetica, sans-serif">Commit research + docs</text>
+  <text x="984" y="452" fill="#475569" font-size="20" font-weight="500" font-family="Arial, Helvetica, sans-serif">Keep learner state local</text>
+  <text x="984" y="480" fill="#475569" font-size="20" font-weight="500" font-family="Arial, Helvetica, sans-serif">Future agents can resume</text>
+
+  <rect x="612" y="522" width="624" height="74" rx="20" fill="#FFFDF8" stroke="#0F172A" stroke-width="2"/>
+  <text x="646" y="568" fill="#0F172A" font-size="28" font-weight="700" font-family="Arial, Helvetica, sans-serif">
+    Repo-local education layer for onboarding, greenfield work, and team handoff
+  </text>
+</svg>
