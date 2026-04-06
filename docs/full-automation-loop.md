@@ -11,6 +11,8 @@ The full automation loop should do four things well:
 3. turn research into a lesson path
 4. revise the lesson path using learner signals
 
+The intended entrypoint is a single pasted prompt to a capable coding agent.
+
 ## The Right Product Shape
 
 This is not a generic chat app.
@@ -21,8 +23,11 @@ It is a local knowledge and curriculum engine with:
 - a research artifact layer
 - a curriculum layer
 - a learner feedback loop
+- an embedded install shape at `./.vibe-coach/`
 
 ## Phase 1: Repo Intake
+
+In the default product shape, the engine lives in `./.vibe-coach/` and the host repo is the project being inspected.
 
 Inputs:
 

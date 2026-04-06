@@ -18,6 +18,7 @@ It should explain:
 - which files are safe to rewrite for adaptation
 - which files define the reusable engine
 - what commands prove the adaptation still works
+- how embedded mode works when Vibe Coach lives in `./.vibe-coach/`
 
 ### `vibe-coach.project.ts`
 
@@ -31,6 +32,7 @@ An AI should update it with:
 - research directory
 - learning track metadata
 - adaptation blueprint details when the target repo needs different inspection or lesson priorities
+- embedded install details for the host repo relationship
 
 ### `research/...`
 

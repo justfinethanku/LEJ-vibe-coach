@@ -11,6 +11,20 @@ Its job is to turn repo context into:
 - quizzes and progress tracking
 - learner feedback that can personalize later lessons
 
+## Embedded Mode
+
+Vibe Coach is meant to be installed inside another repo as:
+
+- `./.vibe-coach/`
+
+In embedded mode:
+
+- the Vibe Coach engine root is `./.vibe-coach`
+- the host repo is the parent workspace
+- the real project you should research is usually `../`, not `./.vibe-coach`
+
+Do not accidentally research Vibe Coach itself when the goal is to teach the host repo.
+
 ## Default Working Rule
 
 Keep the engine stable. Adapt the content.
@@ -55,6 +69,8 @@ When inspecting a repo, read:
 - deployment, workflow, or infrastructure files
 
 Use `vibe-coach.project.ts` as the structured guide for what to inspect and what deliverables to create.
+
+When Vibe Coach is embedded in `./.vibe-coach`, treat the parent repo as the inspection target and write the learning artifacts into `./.vibe-coach`.
 
 ## Curriculum Rules
 

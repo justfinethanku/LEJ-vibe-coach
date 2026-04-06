@@ -61,3 +61,10 @@ The important shift is architectural:
 - Added a repo-level `AGENTS.md` contract for future AI adaptation work.
 - Expanded [`vibe-coach.project.ts`](../vibe-coach.project.ts) with an explicit adaptation blueprint.
 - Added a full automation loop doc to keep the next product phase grounded.
+
+### Embedded adoption model
+
+- Defined the default install shape as `./.vibe-coach/` inside a host repo.
+- Added explicit embedded-install metadata in [`vibe-coach.project.ts`](../vibe-coach.project.ts).
+- Added a prompt library for first-time install and refresh flows.
+- Documented the shareable-versus-local artifact split so teams can commit the teaching layer without committing personal learner state.

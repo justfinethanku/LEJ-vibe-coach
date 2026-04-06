@@ -3,6 +3,14 @@ type ResearchDeliverable = {
   purpose: string
 }
 
+type EmbeddedInstall = {
+  directoryName: string
+  hostRepositoryRootRelativePath: string
+  committedArtifacts: string[]
+  localOnlyArtifacts: string[]
+  launchCommand: string
+}
+
 type AdaptationBlueprint = {
   inspectPaths: string[]
   ignorePaths: string[]
@@ -34,6 +42,28 @@ export const PROJECT_CONTEXT = {
   },
   audience:
     'Builders onboarding into unfamiliar codebases, new domains, or early product ideas where they do not yet know what they do not know.',
+}
+
+export const EMBEDDED_INSTALL: EmbeddedInstall = {
+  directoryName: '.vibe-coach',
+  hostRepositoryRootRelativePath: '..',
+  committedArtifacts: [
+    'AGENTS.md',
+    'README.md',
+    'docs/',
+    'research/',
+    'server/content.ts',
+    'vibe-coach.project.ts',
+    'src/',
+    'server/',
+    'package.json',
+  ],
+  localOnlyArtifacts: [
+    'data/*.sqlite',
+    'data/*.sqlite-shm',
+    'data/*.sqlite-wal',
+  ],
+  launchCommand: 'cd .vibe-coach && npm run dev',
 }
 
 export const ADAPTATION_BLUEPRINT: AdaptationBlueprint = {

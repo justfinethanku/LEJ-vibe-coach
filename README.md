@@ -18,6 +18,17 @@ The current seeded example in this repo is the `Local AI Coding Harness` project
 3. Start the app with `npm run dev`.
 4. Open `http://localhost:5173` in the browser.
 
+## Dead-Simple Adoption
+
+The intended end-user flow is:
+
+1. open your project in a capable coding agent
+2. copy the bootstrap prompt from [`prompts/bootstrap-into-current-repo.md`](./prompts/bootstrap-into-current-repo.md)
+3. paste it into the agent
+4. let the agent install Vibe Coach into `./.vibe-coach/`
+
+After that first run, the repo should contain a reusable Vibe Coach layer that future agents can pick up and continue.
+
 ## Core Product Idea
 
 Drop Vibe Coach into a repo.
@@ -57,6 +68,10 @@ The adaptation surface is:
   The step-by-step instructions an AI should follow when adapting Vibe Coach to a user’s repo.
 - [`docs/full-automation-loop.md`](./docs/full-automation-loop.md)
   The target end-to-end workflow from repo inspection to personalized lesson updates.
+- [`docs/embedded-install-mode.md`](./docs/embedded-install-mode.md)
+  The install model for embedding Vibe Coach into `./.vibe-coach/` inside another repo.
+- [`prompts`](./prompts)
+  Copy-paste prompt entrypoints for capable coding agents.
 
 ## Current Stack
 
@@ -121,8 +136,9 @@ What it does do is put the right system boundaries in place so those features ca
 
 The intended adaptation loop is:
 
-1. Read [`AGENTS.md`](./AGENTS.md) and [`vibe-coach.project.ts`](./vibe-coach.project.ts).
-2. Inspect the target repo and write project-specific research into `research/...`.
-3. Update the project context and lesson seed content.
-4. Run `npm run verify`.
-5. Use learner comments and quiz history to refine later lessons.
+1. Install Vibe Coach into `./.vibe-coach/` inside the host repo.
+2. Read [`AGENTS.md`](./AGENTS.md) and [`vibe-coach.project.ts`](./vibe-coach.project.ts).
+3. Inspect the host repo and write project-specific research into `./.vibe-coach/research/...`.
+4. Update the project context and lesson seed content.
+5. Run `npm run verify`.
+6. Use learner comments and quiz history to refine later lessons.

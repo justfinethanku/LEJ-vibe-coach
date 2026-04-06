@@ -6,6 +6,8 @@ Adapt Vibe Coach to a user’s repo quickly and cleanly.
 
 Read [`AGENTS.md`](../AGENTS.md) first.
 
+If Vibe Coach is embedded into a host repo, treat the host repo as the project being taught and `./.vibe-coach/` as the engine workspace.
+
 ## Workflow
 
 ### 1. Gather repo context
@@ -18,6 +20,8 @@ Read:
 - core source directories
 - issue tracker or roadmap docs if available
 - the structured blueprint in [`vibe-coach.project.ts`](../vibe-coach.project.ts)
+
+If installed in `./.vibe-coach/`, those reads should come from the parent repo, not the engine folder.
 
 Output:
 

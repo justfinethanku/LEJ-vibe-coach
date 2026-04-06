@@ -25,6 +25,8 @@ Includes:
 
 - repo-level AI instructions and adaptation contract
 - structured project blueprint for inspection and curriculum framing
+- one-prompt embedded install into `./.vibe-coach/`
+- prompt-driven refresh of research and curriculum
 - repo inspection workflow
 - research doc generation
 - project context updates
