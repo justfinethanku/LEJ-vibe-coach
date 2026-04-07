@@ -50,9 +50,15 @@ That makes it useful for:
 
 ## How It Works
 
-<p align="center">
-  <img src="./assets/vibe-coach-workflow.svg" alt="Vibe Coach workflow" width="100%" />
-</p>
+```mermaid
+flowchart LR
+  A["Paste the bootstrap prompt into a capable coding agent"] --> B["Install Vibe Coach into ./.vibe-coach"]
+  B --> C["Inspect the host repo and write research markdown"]
+  C --> D["Generate project-specific lessons and quizzes"]
+  D --> E["Run verify and launch the local app"]
+  E --> F["Capture comments, quiz history, and confidence signals"]
+  F --> G["Refresh the curriculum as the repo and learner evolve"]
+```
 
 ## Install In One Prompt
 

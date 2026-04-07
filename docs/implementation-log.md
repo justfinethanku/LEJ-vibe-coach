@@ -74,10 +74,11 @@ The important shift is architectural:
 - Added the MIT License for a permissive launch posture.
 - Added [`CONTRIBUTING.md`](../CONTRIBUTING.md) so contributors know how to work on the project.
 - Rebuilt the README as a launch-ready front page with badges, a stronger product pitch, and visual assets.
-- Added branded SVG visuals in `assets/` for the repo hero and the core workflow.
+- Added repo launch visuals and then tightened the README to favor clearer presentation over novelty.
 
 ### Final launch tightening
 
 - Added the launch photo to the top of the README.
 - Tightened the README sections so the install story is obvious on first read.
 - Added package metadata for GitHub and future package-manager visibility.
+- Replaced the generated workflow graphic with a cleaner Mermaid diagram.
