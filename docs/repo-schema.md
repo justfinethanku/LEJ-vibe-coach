@@ -43,6 +43,9 @@ Why markdown first:
 - easy for humans to inspect
 - easy for AI to patch
 - easy to diff
+- good source material for import into SQLite
+
+This is a source-artifact choice, not a “markdown memory” pattern.
 
 ### `server/content.ts`
 

@@ -67,6 +67,8 @@ Why markdown first:
 - diffs stay understandable
 - the database can be rebuilt from source material
 
+The markdown layer is source input for the system, not the system’s memory model.
+
 ## Phase 3: Curriculum Drafting
 
 The agent updates:

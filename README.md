@@ -24,7 +24,7 @@ You paste one prompt into a capable coding agent. The agent installs Vibe Coach 
 
 ## What You Get
 
-- repo-specific research stored as markdown
+- repo-specific research source files in markdown, imported into SQLite
 - a progressive lesson path generated from that research
 - quizzes, notes, and confidence tracking
 - a repo-local onboarding layer that future agents can resume
@@ -36,8 +36,8 @@ Most onboarding docs are stale, generic, or disconnected from the code.
 
 Vibe Coach takes a different approach:
 
-- research is stored as inspectable markdown
-- lessons and quizzes are generated from that research
+- research starts as human-editable markdown source files and is imported into SQLite
+- lessons, quizzes, comments, and progress live in SQLite
 - learner comments and quiz results become feedback for the next pass
 - the learning layer lives inside the repo it teaches
 

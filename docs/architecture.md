@@ -49,8 +49,11 @@ Source:
 
 Responsibility:
 
-- hold raw project research in a human-editable form
+- hold raw project research source material in a human-editable form
 - stay readable outside the app
+- give agents and humans something easy to diff and rewrite
+
+This layer is source material, not the runtime memory system.
 
 ### Database layer
 
@@ -63,6 +66,7 @@ Responsibility:
 - persist imported research documents
 - store lessons and quiz questions
 - track progress, quiz history, and learner notes
+- act as the actual runtime state layer for the learning system
 
 ### API layer
 
@@ -97,7 +101,7 @@ One row for the current project learning context.
 
 ### `research_documents`
 
-Stores imported markdown research with:
+Stores research imported from markdown source files with:
 
 - slug
 - title
