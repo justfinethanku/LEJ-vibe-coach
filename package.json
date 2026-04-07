@@ -2,6 +2,27 @@
   "name": "vibe-coach",
   "private": true,
   "version": "0.0.0",
+  "description": "Repo-local learning layer that teaches you while you build.",
+  "author": "Jonathan Edwards",
+  "homepage": "https://github.com/justfinethanku/LEJ-vibe-coach#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/justfinethanku/LEJ-vibe-coach.git"
+  },
+  "bugs": {
+    "url": "https://github.com/justfinethanku/LEJ-vibe-coach/issues"
+  },
+  "keywords": [
+    "ai",
+    "education",
+    "onboarding",
+    "developer-tools",
+    "agents",
+    "sqlite",
+    "react",
+    "curriculum",
+    "repo-onboarding"
+  ],
   "license": "MIT",
   "type": "module",
   "scripts": {

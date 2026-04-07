@@ -1,12 +1,13 @@
-# Vibe Coach
-
 <p align="center">
-  <img src="./assets/vibe-coach-hero.svg" alt="Vibe Coach hero" width="100%" />
+  <img src="./assets/vibe-coach-launch-photo.jpg" alt="Vibe Coach launch visual" width="100%" />
 </p>
+
+# Vibe Coach
 
 <p align="center">
   <a href="./LICENSE"><img src="https://img.shields.io/badge/License-MIT-0F172A?style=flat-square" alt="MIT License" /></a>
   <a href="./CONTRIBUTING.md"><img src="https://img.shields.io/badge/Contributions-Welcome-F59E0B?style=flat-square" alt="Contributions welcome" /></a>
+  <img src="https://img.shields.io/badge/Status-Alpha-B45309?style=flat-square" alt="Alpha status" />
   <img src="https://img.shields.io/badge/Mode-.vibe--coach-0F766E?style=flat-square" alt="Embedded mode" />
   <img src="https://img.shields.io/badge/Runtime-Local--First-EA580C?style=flat-square" alt="Local first" />
   <img src="https://img.shields.io/badge/Stack-React%20%2B%20SQLite-2563EB?style=flat-square" alt="React and SQLite" />
@@ -20,6 +21,14 @@
 Vibe Coach turns a repo into a living course.
 
 You paste one prompt into a capable coding agent. The agent installs Vibe Coach into `./.vibe-coach/`, researches the host repo, writes a lesson path, seeds quizzes, and leaves behind a repo-local learning layer that future humans and agents can keep improving.
+
+## What You Get
+
+- repo-specific research stored as markdown
+- a progressive lesson path generated from that research
+- quizzes, notes, and confidence tracking
+- a repo-local onboarding layer that future agents can resume
+- shared teaching artifacts in git and private learner state kept local
 
 ## Why This Exists
 
@@ -45,7 +54,7 @@ That makes it useful for:
   <img src="./assets/vibe-coach-workflow.svg" alt="Vibe Coach workflow" width="100%" />
 </p>
 
-## Dead-Simple Adoption
+## Install In One Prompt
 
 The intended flow is:
 
@@ -80,7 +89,7 @@ Local-only artifacts that should stay uncommitted:
 
 That split lets teams share the teaching system while each developer keeps personal quiz history, comments, and progress local.
 
-## Quick Start For This Repo
+## Run This Repo
 
 1. Install dependencies with `npm install`.
 2. Seed the database with `npm run db:sync`.
@@ -121,7 +130,7 @@ Not automated yet:
 
 That is intentional. The repo is biased toward inspectability over AI magic.
 
-## Important Files
+## Key Files
 
 - [`AGENTS.md`](./AGENTS.md)
   The repo-level instructions another AI should follow.
@@ -138,8 +147,16 @@ That is intentional. The repo is biased toward inspectability over AI magic.
 - [`prompts`](./prompts)
   Copy-paste entrypoints for capable coding agents.
 
+## Contributing
+
+Start with [CONTRIBUTING.md](./CONTRIBUTING.md).
+
+The short version:
+
+- keep the engine stable
+- keep the teaching artifacts inspectable
+- keep the adaptation workflow dead simple
+
 ## Open Source
 
 Vibe Coach is released under the [MIT License](./LICENSE).
-
-If you want to contribute, start with [CONTRIBUTING.md](./CONTRIBUTING.md).
