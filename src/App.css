@@ -17,9 +17,46 @@
 
 .sidebar__header h1,
 .hero-panel h2,
-.lesson-header h3,
+.lesson-header h2,
+.section-heading h3,
 .section-heading h4,
-.section-heading h5 {
+.sidebar__section-title h2 {
+  margin: 0;
+}
+
+.sidebar__section-title h2 {
+  font: inherit;
+}
+
+.main-panel .eyebrow {
+  color: #75501f;
+}
+
+.skip-link {
+  position: fixed;
+  top: 0.5rem;
+  left: 0.5rem;
+  z-index: 10;
+  transform: translateY(-200%);
+  padding: 0.75rem 1rem;
+  background: #102442;
+  color: #fff;
+}
+
+.skip-link:focus {
+  transform: none;
+}
+
+:where(a, button, input, select, textarea, [tabindex]):focus-visible {
+  outline: 3px solid #1d4a73;
+  outline-offset: 3px;
+}
+
+.sidebar :focus-visible {
+  outline-color: #f8d49f;
+}
+
+.save-status:empty {
   margin: 0;
 }
 
@@ -131,6 +168,7 @@
 }
 
 .main-panel {
+  min-width: 0;
   padding: 2rem;
 }
 
@@ -276,6 +314,21 @@
   color: #455063;
 }
 
+.sidebar .status-not_started {
+  background: #3c4657;
+  color: #f8f3ea;
+}
+
+.sidebar .status-in_progress {
+  background: #59421e;
+  color: #ffe0a8;
+}
+
+.sidebar .status-completed {
+  background: #234c3b;
+  color: #b5f2d0;
+}
+
 .status-in_progress {
   background: rgba(210, 142, 44, 0.15);
   color: #8b5e17;
@@ -293,6 +346,7 @@
 
 .markdown-body {
   color: #152033;
+  overflow-wrap: anywhere;
 }
 
 .markdown-body h2,
@@ -311,7 +365,7 @@
 }
 
 .muted {
-  color: rgba(21, 32, 51, 0.56);
+  color: #566174;
   font-size: 0.9rem;
 }
 
@@ -326,7 +380,8 @@
 }
 
 .primary-button:disabled,
-.secondary-button:disabled {
+.secondary-button:disabled,
+.primary-button[aria-disabled='true'] {
   opacity: 0.6;
   cursor: default;
 }
@@ -340,11 +395,16 @@
 .field select,
 .field textarea {
   width: 100%;
-  border: 1px solid rgba(17, 24, 38, 0.12);
+  border: 1px solid #778397;
   border-radius: 0.95rem;
   padding: 0.75rem 0.9rem;
   background: rgba(255, 255, 255, 0.82);
   color: #152033;
+}
+
+.field textarea::placeholder {
+  color: #566174;
+  opacity: 1;
 }
 
 .quiz-question {
@@ -444,6 +504,21 @@
   50% {
     transform: scale(1.04);
     opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .panel-loader__pulse {
+    animation: none;
+  }
+
+  .nav-card {
+    transition: none;
+  }
+
+  .nav-card:hover,
+  .nav-card.is-active {
+    transform: none;
   }
 }
 

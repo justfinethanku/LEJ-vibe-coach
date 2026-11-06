@@ -1,4 +1,4 @@
-import { startTransition, useEffect, useState } from 'react'
+import { startTransition, useEffect, useRef, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 
 import {
@@ -35,6 +35,11 @@ const statusLabels: Record<LessonStatus, string> = {
   completed: 'Completed',
 }
 
+// Imported Markdown sits below the lesson/research heading in the page outline.
+const markdownHeadings = {
+  h1: 'h3', h2: 'h3', h3: 'h4', h4: 'h5', h5: 'h6', h6: 'h6',
+} as const
+
 const formatDate = (value: string | null) =>
   value
     ? new Intl.DateTimeFormat(undefined, {
@@ -67,6 +72,10 @@ function App() {
   const [quizAnswers, setQuizAnswers] = useState<Record<number, string>>({})
   const [quizResult, setQuizResult] = useState<QuizResult | null>(null)
   const [submittingQuiz, setSubmittingQuiz] = useState(false)
+  const [announcement, setAnnouncement] = useState('')
+  const contentHeading = useRef<HTMLHeadingElement>(null)
+  const focusContentAfterNavigation = useRef(false)
+  const researchRequestPending = useRef(false)
 
   useEffect(() => {
     void (async () => {
@@ -90,16 +99,18 @@ function App() {
     setLessonLoading(true)
     setError(null)
 
+    let cancelled = false
     void (async () => {
       try {
         const detail = await fetchLessonDetail(selectedLessonSlug)
-        setLessonDetail(detail)
+        if (!cancelled) setLessonDetail(detail)
       } catch (loadError) {
-        setError(loadError instanceof Error ? loadError.message : 'Failed to load lesson.')
+        if (!cancelled) setError(loadError instanceof Error ? loadError.message : 'Failed to load lesson.')
       } finally {
-        setLessonLoading(false)
+        if (!cancelled) setLessonLoading(false)
       }
     })()
+    return () => { cancelled = true }
   }, [selectedLessonSlug])
 
   useEffect(() => {
@@ -107,22 +118,38 @@ function App() {
       return
     }
 
+    researchRequestPending.current = true
     setResearchLoading(true)
     setError(null)
 
+    let cancelled = false
     void (async () => {
       try {
         const detail = await fetchResearchDocument(selectedResearchSlug)
-        setResearchDetail(detail)
+        if (!cancelled) setResearchDetail(detail)
       } catch (loadError) {
-        setError(
+        if (!cancelled) setError(
           loadError instanceof Error ? loadError.message : 'Failed to load research document.',
         )
       } finally {
-        setResearchLoading(false)
+        if (!cancelled) {
+          researchRequestPending.current = false
+          setResearchLoading(false)
+        }
       }
     })()
+    return () => { cancelled = true }
   }, [selectedResearchSlug, activeView])
+
+  useEffect(() => {
+    const ready = activeView === 'lesson'
+      ? !lessonLoading && lessonDetail?.lesson.slug === selectedLessonSlug
+      : !researchRequestPending.current && !researchLoading && researchDetail?.slug === selectedResearchSlug
+    if (focusContentAfterNavigation.current && ready && contentHeading.current) {
+      contentHeading.current.focus()
+      focusContentAfterNavigation.current = false
+    }
+  }, [activeView, lessonDetail, lessonLoading, researchDetail, researchLoading, selectedLessonSlug, selectedResearchSlug])
 
   const lessonSlug = lessonDetail?.lesson.slug
   const lessonConfidence = lessonDetail?.lesson.confidence ?? 1
@@ -135,11 +162,14 @@ function App() {
 
     setProgressStatus(lessonStatus)
     setConfidence(lessonConfidence)
+  }, [lessonConfidence, lessonSlug, lessonStatus])
+
+  useEffect(() => {
     setCommentBody('')
     setUnderstandingState('unsure')
     setQuizAnswers({})
     setQuizResult(null)
-  }, [lessonConfidence, lessonSlug, lessonStatus])
+  }, [lessonSlug])
 
   const selectedLessonSummary =
     bootstrap?.lessons.find((lesson) => lesson.slug === selectedLessonSlug) ?? null
@@ -151,6 +181,12 @@ function App() {
   }
 
   const handleLessonSelect = (slug: string) => {
+    focusContentAfterNavigation.current = true
+    setAnnouncement('')
+    if (activeView === 'lesson' && selectedLessonSlug === slug && !lessonLoading) {
+      contentHeading.current?.focus()
+      focusContentAfterNavigation.current = false
+    }
     startTransition(() => {
       setActiveView('lesson')
       setSelectedLessonSlug(slug)
@@ -158,6 +194,12 @@ function App() {
   }
 
   const handleResearchSelect = (slug: string) => {
+    focusContentAfterNavigation.current = true
+    setAnnouncement('')
+    if (activeView === 'research' && selectedResearchSlug === slug && !researchLoading) {
+      contentHeading.current?.focus()
+      focusContentAfterNavigation.current = false
+    }
     startTransition(() => {
       setActiveView('research')
       setSelectedResearchSlug(slug)
@@ -165,17 +207,20 @@ function App() {
   }
 
   const handleSaveProgress = async () => {
-    if (!lessonDetail) {
+    if (!lessonDetail || savingProgress) {
       return
     }
 
     setSavingProgress(true)
+    setAnnouncement('Saving progress…')
     setError(null)
 
     try {
       await saveLessonProgress(lessonDetail.lesson.slug, progressStatus, confidence)
       await refreshLessonAndDashboard(lessonDetail.lesson.slug)
+      setAnnouncement('Progress saved.')
     } catch (saveError) {
+      setAnnouncement('')
       setError(saveError instanceof Error ? saveError.message : 'Failed to save progress.')
     } finally {
       setSavingProgress(false)
@@ -183,11 +228,12 @@ function App() {
   }
 
   const handleSaveComment = async () => {
-    if (!lessonDetail || commentBody.trim().length < 10) {
+    if (!lessonDetail || savingComment || commentBody.trim().length < 10) {
       return
     }
 
     setSavingComment(true)
+    setAnnouncement('Saving note…')
     setError(null)
 
     try {
@@ -199,7 +245,9 @@ function App() {
       await refreshLessonAndDashboard(lessonDetail.lesson.slug)
       setCommentBody('')
       setUnderstandingState('unsure')
+      setAnnouncement('Note saved.')
     } catch (saveError) {
+      setAnnouncement('')
       setError(saveError instanceof Error ? saveError.message : 'Failed to save note.')
     } finally {
       setSavingComment(false)
@@ -207,7 +255,7 @@ function App() {
   }
 
   const handleQuizSubmit = async () => {
-    if (!lessonDetail) {
+    if (!lessonDetail || submittingQuiz) {
       return
     }
 
@@ -217,18 +265,24 @@ function App() {
     }))
 
     if (answers.some((answer) => answer.selectedOption.length === 0)) {
+      setAnnouncement('')
       setError('Answer every quiz question before submitting.')
+      const missing = answers.find((answer) => answer.selectedOption.length === 0)
+      document.querySelector<HTMLInputElement>(`input[name="question-${missing?.questionId}"]`)?.focus()
       return
     }
 
     setSubmittingQuiz(true)
+    setAnnouncement('Submitting quiz…')
     setError(null)
 
     try {
       const result = await submitQuiz(lessonDetail.quiz.id, answers)
       setQuizResult(result)
       await refreshLessonAndDashboard(lessonDetail.lesson.slug)
+      setAnnouncement(`Quiz scored ${result.score}%. ${result.correctCount} of ${result.totalQuestions} correct.`)
     } catch (submitError) {
+      setAnnouncement('')
       setError(submitError instanceof Error ? submitError.message : 'Failed to submit quiz.')
     } finally {
       setSubmittingQuiz(false)
@@ -241,6 +295,7 @@ function App() {
 
   return (
     <div className="app-shell">
+      <a className="skip-link" href="#main-content">Skip to learning content</a>
       <aside className="sidebar">
         <div className="sidebar__header">
           <p className="eyebrow">The educational platform that teaches you while you build</p>
@@ -250,9 +305,9 @@ function App() {
           </p>
         </div>
 
-        <section className="sidebar__section">
+        <nav className="sidebar__section" aria-label="Lesson path">
           <div className="sidebar__section-title">
-            <span>Lesson path</span>
+            <h2>Lesson path</h2>
             <span>{bootstrap?.dashboard.completedLessons ?? 0}/{bootstrap?.dashboard.totalLessons ?? 0}</span>
           </div>
           <div className="sidebar__list">
@@ -262,6 +317,7 @@ function App() {
                 className={`nav-card ${selectedLessonSlug === lesson.slug && activeView === 'lesson' ? 'is-active' : ''}`}
                 onClick={() => handleLessonSelect(lesson.slug)}
                 type="button"
+                aria-current={selectedLessonSlug === lesson.slug && activeView === 'lesson' ? 'page' : undefined}
               >
                 <div className="nav-card__topline">
                   <span>{lesson.orderIndex}. {lesson.title}</span>
@@ -277,11 +333,11 @@ function App() {
               </button>
             ))}
           </div>
-        </section>
+        </nav>
 
-        <section className="sidebar__section">
+        <nav className="sidebar__section" aria-label="Research library">
           <div className="sidebar__section-title">
-                    <span>Research library</span>
+                    <h2>Research library</h2>
                     <span>{bootstrap?.researchDocuments.length ?? 0} docs</span>
           </div>
           <div className="sidebar__list sidebar__list--compact">
@@ -291,16 +347,17 @@ function App() {
                 className={`nav-card nav-card--compact ${selectedResearchSlug === document.slug && activeView === 'research' ? 'is-active' : ''}`}
                 onClick={() => handleResearchSelect(document.slug)}
                 type="button"
+                aria-current={selectedResearchSlug === document.slug && activeView === 'research' ? 'page' : undefined}
               >
                 <strong>{document.title}</strong>
                 <p>{document.summary}</p>
               </button>
             ))}
           </div>
-        </section>
+        </nav>
       </aside>
 
-      <main className="main-panel">
+      <main className="main-panel" id="main-content" tabIndex={-1}>
         <header className="hero-panel">
           <div>
             <p className="eyebrow">Current curriculum</p>
@@ -328,20 +385,23 @@ function App() {
           </div>
         </header>
 
-        {error ? <div className="error-banner">{error}</div> : null}
+        {error ? <div className="error-banner" role="alert">{error}</div> : null}
+        <p className="save-status" role="status" aria-atomic="true">{announcement}</p>
 
-        <div className="view-toggle">
+        <div className="view-toggle" role="group" aria-label="Workspace view">
           <button
             className={activeView === 'lesson' ? 'is-selected' : ''}
-            onClick={() => setActiveView('lesson')}
+            onClick={() => selectedLessonSlug && handleLessonSelect(selectedLessonSlug)}
             type="button"
+            aria-pressed={activeView === 'lesson'}
           >
             Learning studio
           </button>
           <button
             className={activeView === 'research' ? 'is-selected' : ''}
-            onClick={() => setActiveView('research')}
+            onClick={() => selectedResearchSlug && handleResearchSelect(selectedResearchSlug)}
             type="button"
+            aria-pressed={activeView === 'research'}
           >
             Research vault
           </button>
@@ -358,7 +418,7 @@ function App() {
                     <p className="eyebrow">
                       Lesson {lessonDetail.lesson.orderIndex} · {lessonDetail.lesson.stage}
                     </p>
-                    <h3>{lessonDetail.lesson.title}</h3>
+                    <h2 ref={contentHeading} tabIndex={-1}>{lessonDetail.lesson.title}</h2>
                     <p className="content-card__summary">{lessonDetail.lesson.summary}</p>
                   </div>
 
@@ -380,26 +440,27 @@ function App() {
                 </div>
 
                 <div className="markdown-body">
-                  <ReactMarkdown>{lessonDetail.lesson.content}</ReactMarkdown>
+                  <ReactMarkdown components={markdownHeadings}>{lessonDetail.lesson.content}</ReactMarkdown>
                 </div>
               </section>
 
               <section className="side-column">
                 <article className="content-card">
                   <div className="section-heading">
-                    <h4>Progress</h4>
+                    <h3>Progress</h3>
                     <span className="muted">
                       Last viewed {formatDate(lessonDetail.lesson.lastViewedAt)}
                     </span>
                   </div>
 
-                  <div className="status-controls">
+                  <div className="status-controls" role="group" aria-label="Lesson status">
                     {(['not_started', 'in_progress', 'completed'] as LessonStatus[]).map((status) => (
                       <button
                         key={status}
                         className={progressStatus === status ? 'is-selected' : ''}
                         onClick={() => setProgressStatus(status)}
                         type="button"
+                        aria-pressed={progressStatus === status}
                       >
                         {statusLabels[status]}
                       </button>
@@ -408,16 +469,18 @@ function App() {
 
                   <div className="confidence-scale">
                     <div className="section-heading">
-                      <h5>Confidence</h5>
+                      <h4>Confidence</h4>
                       <span className="muted">{confidenceLabels[confidence - 1]}</span>
                     </div>
-                    <div className="confidence-buttons">
+                    <div className="confidence-buttons" role="group" aria-label="Confidence">
                       {confidenceLabels.map((label, index) => (
                         <button
                           key={label}
                           className={confidence === index + 1 ? 'is-selected' : ''}
                           onClick={() => setConfidence(index + 1)}
                           type="button"
+                          aria-label={`${index + 1}: ${label}`}
+                          aria-pressed={confidence === index + 1}
                         >
                           {index + 1}
                         </button>
@@ -427,7 +490,7 @@ function App() {
 
                   <button
                     className="primary-button"
-                    disabled={savingProgress}
+                    aria-disabled={savingProgress}
                     onClick={handleSaveProgress}
                     type="button"
                   >
@@ -437,7 +500,7 @@ function App() {
 
                 <article className="content-card">
                   <div className="section-heading">
-                    <h4>{lessonDetail.quiz.title}</h4>
+                    <h3>{lessonDetail.quiz.title}</h3>
                     <span className="muted">
                       Target score {lessonDetail.quiz.passingScore}%
                     </span>
@@ -482,7 +545,7 @@ function App() {
 
                   <button
                     className="primary-button"
-                    disabled={submittingQuiz}
+                    aria-disabled={submittingQuiz}
                     onClick={handleQuizSubmit}
                     type="button"
                   >
@@ -507,7 +570,7 @@ function App() {
 
                 <article className="content-card">
                   <div className="section-heading">
-                    <h4>Lesson notes</h4>
+                    <h3>Lesson notes</h3>
                     <span className="muted">These are the teaching signals for future revisions.</span>
                   </div>
 
@@ -530,6 +593,7 @@ function App() {
                   <label className="field">
                     <span>Write what clicked or what did not.</span>
                     <textarea
+                      aria-describedby="note-help"
                       onChange={(event) => setCommentBody(event.target.value)}
                       placeholder="Example: I understand why the host owns permissions, but I still need a simpler example of session state versus workflow state."
                       rows={6}
@@ -537,9 +601,11 @@ function App() {
                     />
                   </label>
 
+                  <p className="muted" id="note-help">Use at least 10 characters to save a note.</p>
+
                   <button
                     className="primary-button"
-                    disabled={savingComment || commentBody.trim().length < 10}
+                    aria-disabled={savingComment || commentBody.trim().length < 10}
                     onClick={handleSaveComment}
                     type="button"
                   >
@@ -567,7 +633,7 @@ function App() {
 
                 <article className="content-card">
                   <div className="section-heading">
-                    <h4>Related research</h4>
+                    <h3>Related research</h3>
                     <span className="muted">Open the underlying source notes at any time.</span>
                   </div>
 
@@ -595,7 +661,7 @@ function App() {
             <div className="lesson-header">
               <div>
                 <p className="eyebrow">Research library · {researchDetail.category}</p>
-                <h3>{researchDetail.title}</h3>
+                <h2 ref={contentHeading} tabIndex={-1}>{researchDetail.title}</h2>
                 <p className="content-card__summary">{researchDetail.summary}</p>
               </div>
 
@@ -615,7 +681,7 @@ function App() {
             </div>
 
             <div className="markdown-body">
-              <ReactMarkdown>{researchDetail.content}</ReactMarkdown>
+              <ReactMarkdown components={markdownHeadings}>{researchDetail.content}</ReactMarkdown>
             </div>
           </section>
         )}
@@ -635,8 +701,8 @@ function MetricCard({ label, value }: { label: string; value: string }) {
 
 function PanelLoader({ label }: { label: string }) {
   return (
-    <div className="panel-loader">
-      <div className="panel-loader__pulse" />
+    <div className="panel-loader" role="status">
+      <div className="panel-loader__pulse" aria-hidden="true" />
       <p>{label}</p>
     </div>
   )
