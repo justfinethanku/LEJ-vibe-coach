@@ -752,7 +752,7 @@ export const createCoachStore = (db: Database.Database, options: CoachStoreOptio
   ) => {
     const questionRows = db.prepare(
       `
-        SELECT id, prompt, correct_option AS correctOption, explanation
+        SELECT id, prompt, options_json AS optionsJson, correct_option AS correctOption, explanation
         FROM quiz_questions
         WHERE quiz_id = ?
         ORDER BY order_index
@@ -760,6 +760,7 @@ export const createCoachStore = (db: Database.Database, options: CoachStoreOptio
     ).all(quizId) as Array<{
       id: number
       prompt: string
+      optionsJson: string
       correctOption: string
       explanation: string
     }>
@@ -768,7 +769,23 @@ export const createCoachStore = (db: Database.Database, options: CoachStoreOptio
       throw new Error('Quiz not found.')
     }
 
-    const answerMap = new Map(answers.map((answer) => [answer.questionId, answer.selectedOption]))
+    // Match the UI contract before any learner writes. A partial or stale quiz
+    // is a rejected submission, not an attempt scored with implicit blanks.
+    if (answers.length !== questionRows.length) {
+      throw new Error('Answer every quiz question exactly once.')
+    }
+    const questionsById = new Map(questionRows.map((question) => [question.id, question]))
+    const answerMap = new Map<number, string>()
+    for (const answer of answers) {
+      const question = questionsById.get(answer.questionId)
+      if (!question || answerMap.has(answer.questionId)) {
+        throw new Error('Answer every quiz question exactly once.')
+      }
+      if (!parseJson<string[]>(question.optionsJson).includes(answer.selectedOption)) {
+        throw new Error('Select an offered option for every quiz question.')
+      }
+      answerMap.set(answer.questionId, answer.selectedOption)
+    }
     const results = questionRows.map((question) => {
       const selectedOption = answerMap.get(question.id) ?? ''
       const isCorrect = selectedOption === question.correctOption

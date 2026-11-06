@@ -113,14 +113,64 @@ test('local API rejects untrusted browser requests without changing learner stat
   assert.equal(comment.status, 200)
   assert.equal((await comment.json()).comments[0].body, note)
   const quiz = await fetch(`${server.url}/api/quizzes/${detail.quiz.id}/submit`, {
-    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ answers: [] }),
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ answers: detail.quiz.questions.map((question: { id: number; options: string[] }) => ({
+      questionId: question.id, selectedOption: question.options[0],
+    })) }),
   })
   assert.equal(quiz.status, 200)
-  assert.equal((await quiz.json()).score, 0)
+  assert.equal((await quiz.json()).totalQuestions, detail.quiz.questions.length)
   const research = await fetch(`${server.url}/api/research/${bootstrap.researchDocuments[0].slug}`)
   assert.equal(research.status, 200)
   assert.ok((await research.json()).content.length > 0)
   assert.equal((await fetch(`${server.url}/api/lessons/${encodeURIComponent("' OR 1=1 --")}`)).status, 404)
+})
+
+test('quiz API rejects incomplete and unrelated answers without changing learner state', async (t) => {
+  const server = await startFixture()
+  t.after(server.stop)
+  const bootstrap = await (await fetch(`${server.url}/api/bootstrap`)).json()
+  const detailUrl = `${server.url}/api/lessons/${bootstrap.lessons[0].slug}`
+  const detail = await (await fetch(detailUrl)).json()
+  const answers = detail.quiz.questions.map((question: { id: number; options: string[] }) => ({
+    questionId: question.id, selectedOption: question.options[0],
+  }))
+  const other = await (await fetch(`${server.url}/api/lessons/${bootstrap.lessons[1].slug}`)).json()
+  const endpoint = `${server.url}/api/quizzes/${detail.quiz.id}/submit`
+  const post = (url: string, body: unknown) => fetch(url, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+  })
+  const cases = [
+    { name: 'empty', answers: [] },
+    { name: 'missing', answers: answers.slice(1) },
+    { name: 'duplicate', answers: [answers[0], ...answers.slice(0, -1)] },
+    { name: 'foreign', answers: [{ ...answers[0], questionId: other.quiz.questions[0].id }, ...answers.slice(1)] },
+    { name: 'unknown', answers: [{ ...answers[0], questionId: 999_999 }, ...answers.slice(1)] },
+    { name: 'invalid option', answers: [{ ...answers[0], selectedOption: 'Not offered' }, ...answers.slice(1)] },
+    { name: 'blank', answers: [{ ...answers[0], selectedOption: '' }, ...answers.slice(1)] },
+    { name: 'noninteger question', answers: [{ ...answers[0], questionId: 1.5 }, ...answers.slice(1)] },
+  ]
+  for (const entry of cases) {
+    await t.test(entry.name, async () => {
+      const response = await post(endpoint, { answers: entry.answers })
+      assert.equal(response.status, 400)
+      assert.equal(typeof (await response.json()).error, 'string')
+      assert.deepEqual(await (await fetch(detailUrl)).json(), detail)
+      assert.deepEqual(await (await fetch(`${server.url}/api/bootstrap`)).json(), bootstrap)
+    })
+  }
+  assert.equal((await post(`${server.url}/api/quizzes/999999/submit`, { answers })).status, 400)
+  assert.equal((await post(endpoint, {})).status, 400)
+  // Correctly shaped wrong choices still count as real attempts.
+  const accepted = await post(endpoint, { answers: answers.reverse() })
+  assert.equal(accepted.status, 200)
+  const result = await accepted.json()
+  assert.equal(result.totalQuestions, detail.quiz.questions.length)
+  const after = await (await fetch(detailUrl)).json()
+  assert.equal(after.lesson.status, 'in_progress')
+  assert.equal(after.quiz.recentAttempts.length, 1)
+  assert.equal(after.quiz.recentAttempts[0].score, result.score)
+  assert.equal((await (await fetch(`${server.url}/api/bootstrap`)).json()).dashboard.attemptCount, 1)
 })
 
 test('API socket is unavailable on a non-loopback interface', async (t) => {
