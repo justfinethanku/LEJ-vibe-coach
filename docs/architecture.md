@@ -93,6 +93,34 @@ Responsibility:
 - capture signals about learner understanding
 - show measurable progress over time
 
+## Runtime boundaries and data flow
+
+| Layer | Inputs | Output and side effects |
+| --- | --- | --- |
+| Project adaptation | `vibe-coach.project.ts`, `server/content.ts`, research markdown | Inspectable project, track, lesson and quiz seeds |
+| Local runtime setup | `server/db.ts`, paths from `server/paths.ts` | Opens the local SQLite connection with WAL and supplies the project inputs to the store |
+| Reusable store | `createCoachStore(connection, options)` in `server/store.ts` | Schema, research import, curriculum sync, queries and learner writes on the supplied connection |
+| HTTP API | `server/index.ts` | Initializes and syncs the default store, checks the local request boundary, validates writes and returns JSON |
+| Browser | `src/lib/api.ts`, `src/lib/types.ts`, `src/App.tsx` | Fetches bootstrap/details, renders lessons and research, submits learner signals |
+
+`server/store.ts` has no runtime dependency on the sample curriculum or default
+paths. Importing it opens no database and reads no research. The caller supplies
+a SQLite connection and the project, track, lessons, research directory and
+research metadata. The caller also owns closing that connection. Each connection
+holds one project and one learner; multiple stores use separate connections and
+research directories, rather than sharing one database between projects.
+
+The existing server and database CLI commands use `server/db.ts` as their local
+setup module. Startup and `db:sync` explicitly initialize the schema and run the
+seed transaction. The transaction imports research and upserts curriculum while
+preserving progress, comments and quiz history. Request handlers then read from
+SQLite; they do not reread markdown for each request. Quiz submissions write the
+attempt, responses and progress aggregates in one transaction.
+
+`tests/store.test.ts` exercises independent stores, refresh/reopen preservation,
+quiz scoring and rollback after a failed research import. The HTTP tests exercise
+the default local setup through real server processes. Run both with `npm test`.
+
 ## Schema
 
 ### `projects`
