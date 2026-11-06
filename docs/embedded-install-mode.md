@@ -58,6 +58,11 @@ That keeps quiz history, comments, and personal progress local to each developer
 
 ## First-Run Flow
 
+Use the [README setup](../README.md#run-this-repo) for runtime prerequisites
+and commands, running them from `.vibe-coach` after installation. The bootstrap
+prompt delegates research and adaptation to the coding agent; the included
+course is a sample until those content files are changed.
+
 1. A user opens their host repo in a capable coding agent.
 2. They paste the Vibe Coach bootstrap prompt.
 3. The agent installs Vibe Coach into `./.vibe-coach/`.
@@ -73,6 +78,11 @@ As the host repo evolves:
 2. the agent inspects recent changes in the host repo
 3. the research and lesson pack are updated
 4. local learner state stays intact
+
+Follow [Local operations](./local-operations.md#refresh-curriculum) for backups
+and current refresh limitations. Sync currently upserts content but does not
+retire removed lessons, research, or questions; do not reset a database whose
+learner history you want to preserve.
 
 ## Product Rule
 
