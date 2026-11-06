@@ -20,6 +20,23 @@ const port = Number(process.env.PORT ?? 8787)
 initializeDatabase()
 syncSeedData()
 
+// This engine has one private learner database and no remote-user auth.
+// Check the authority as well as the socket to reject DNS rebinding requests.
+const localAuthority = /^(localhost|127\.0\.0\.1|\[::1\])(?::\d{1,5})?$/i
+app.use((request, response, next) => {
+  const origin = request.get('Origin')
+  const localOrigin = origin !== undefined && origin.startsWith('http://') &&
+    localAuthority.test(origin.slice('http://'.length))
+
+  if (!localAuthority.test(request.get('Host') ?? '') ||
+      (origin !== undefined && !localOrigin) ||
+      (origin === undefined && request.get('Sec-Fetch-Site') === 'cross-site')) {
+    response.status(403).json({ error: 'Vibe Coach accepts local requests only.' })
+    return
+  }
+  next()
+})
+
 app.use(express.json())
 
 app.get('/api/bootstrap', (_request, response) => {
@@ -124,11 +141,11 @@ app.get('/api/research/:slug', (request, response) => {
 
 if (process.env.NODE_ENV === 'production' && existsSync(DIST_DIR)) {
   app.use(express.static(DIST_DIR))
-  app.get('*', (_request, response) => {
+  app.get('/{*path}', (_request, response) => {
     response.sendFile('index.html', { root: DIST_DIR })
   })
 }
 
-app.listen(port, () => {
+app.listen(port, '127.0.0.1', () => {
   console.log(`vibe-coach server listening on http://localhost:${port}`)
 })
