@@ -27,7 +27,7 @@
   "type": "module",
   "scripts": {
     "dev": "concurrently -k \"npm:dev:server\" \"npm:dev:client\"",
-    "dev:client": "vite --host",
+    "dev:client": "vite",
     "dev:server": "tsx watch server/index.ts",
     "build": "tsc -b && vite build",
     "serve": "NODE_ENV=production tsx server/index.ts",
@@ -35,7 +35,8 @@
     "db:sync": "tsx server/sync-db.ts",
     "lint": "eslint .",
     "preview": "vite preview",
-    "verify": "npm run db:sync && npm run lint && npm run build"
+    "test": "node --import tsx --test --test-concurrency=2 tests/*.test.ts",
+    "verify": "npm run db:sync && npm test && npm run lint && npm run build"
   },
   "dependencies": {
     "better-sqlite3": "^12.8.0",

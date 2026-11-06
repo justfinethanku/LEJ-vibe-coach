@@ -102,12 +102,19 @@ That split lets teams share the teaching system while each developer keeps perso
 3. Start the app with `npm run dev`.
 4. Open `http://localhost:5173`.
 
+Vibe Coach keeps one learner's state on the local machine. The API binds to
+`127.0.0.1`, and the frontend uses Vite's local-only default. Open the app through
+`localhost` or `127.0.0.1`; other hostnames and external browser origins receive
+HTTP 403. There is no remote-user authentication or shared learner isolation.
+
 ## Scripts
 
 - `npm run dev`
   Starts the Vite frontend and Express API together.
 - `npm run verify`
-  Runs the baseline validation pass: DB sync, lint, and build.
+  Runs DB sync, isolated HTTP security tests, lint, and build.
+- `npm test`
+  Tests the local access boundary and lesson flow using temporary SQLite databases.
 - `npm run build`
   Type-checks and builds the frontend.
 - `npm run serve`
