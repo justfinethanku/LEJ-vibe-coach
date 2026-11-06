@@ -181,6 +181,13 @@ export const createCoachStore = (db: Database.Database, options: CoachStoreOptio
         understanding_state TEXT NOT NULL,
         created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
       );
+
+      -- Keep dashboard follow-up counts and lesson history reads scoped to
+      -- the selected lesson/quiz as the private learner database grows.
+      CREATE INDEX IF NOT EXISTS lesson_comments_by_lesson
+        ON lesson_comments (lesson_id, created_at DESC);
+      CREATE INDEX IF NOT EXISTS quiz_attempts_by_quiz
+        ON quiz_attempts (quiz_id, created_at DESC);
     `)
   }
 
