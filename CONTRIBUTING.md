@@ -24,9 +24,10 @@ Small focused pull requests are much more likely to land than broad rewrites.
 
 ## Local Setup
 
-1. Run `npm install`.
-2. Run `npm run verify`.
-3. Run `npm run dev` if you need to check the app in the browser.
+Follow the [README setup](./README.md#run-this-repo) for prerequisites, locked
+dependency installation, verification, and local startup. Use the
+[local operations guide](./docs/local-operations.md) before refreshing or
+resetting an installation that contains learner history.
 
 ## Pull Request Rules
 

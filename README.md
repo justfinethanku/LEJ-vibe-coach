@@ -97,32 +97,84 @@ That split lets teams share the teaching system while each developer keeps perso
 
 ## Run This Repo
 
-1. Install dependencies with `npm install`.
-2. Seed the database with `npm run db:sync`.
-3. Start the app with `npm run dev`.
-4. Open `http://localhost:5173`.
+Use Node.js 22.12 or newer in the Node 22 release line, with npm. Setup was
+verified on Ubuntu ARM64 with Node 22.22.2 and npm 10.9.7. Vite's
+[Node requirements](https://vite.dev/guide/#scaffolding-your-first-vite-project)
+and the native `better-sqlite3` dependency constrain runtime compatibility.
+Other platforms and Node release lines were not tested in this setup pass.
+
+1. Clone the engine and enter its root:
+
+   ```bash
+   git clone https://github.com/justfinethanku/LEJ-vibe-coach.git
+   cd LEJ-vibe-coach
+   ```
+
+   For an existing embedded installation, use `cd .vibe-coach` from the host
+   repo instead. Run all following commands from the engine root.
+
+2. Install the locked dependencies, including development tools:
+
+   ```bash
+   npm ci
+   ```
+
+   No API key, environment file, external database, or model service is needed
+   to run the included sample course. An agent adapts the content separately.
+
+3. Sync the sample curriculum and check the app:
+
+   ```bash
+   npm run verify
+   ```
+
+   This creates `data/vibe-coach.sqlite` and runs DB sync, 27 behavior tests,
+   lint, TypeScript checks, and the frontend build. The tests use temporary
+   databases; DB sync uses this installation's learner database.
+
+4. Start development mode:
+
+   ```bash
+   npm run dev
+   ```
+
+5. Open `http://localhost:5173` (or the local URL Vite prints). The API listens
+   at `http://127.0.0.1:8787`; Vite proxies `/api` to it. Expect the included
+   local AI coding harness course until you adapt the project content. Open a
+   lesson, save progress, then restart the app to confirm it persists. Stop both
+   development processes with Ctrl+C in the terminal running `npm run dev`.
 
 Vibe Coach keeps one learner's state on the local machine. The API binds to
 `127.0.0.1`, and the frontend uses Vite's local-only default. Open the app through
 `localhost` or `127.0.0.1`; other hostnames and external browser origins receive
 HTTP 403. There is no remote-user authentication or shared learner isolation.
 
+To run the built app, stop development mode, run `npm run build`, then run
+`npm run serve` and open `http://localhost:8787`. Both the built frontend and
+API are served by Express. See [Local operations](./docs/local-operations.md)
+for ports, backups, restore, curriculum refresh, and failure diagnosis.
+
 ## Scripts
 
 - `npm run dev`
   Starts the Vite frontend and Express API together.
 - `npm run verify`
-  Runs DB sync, isolated HTTP security tests, lint, and build.
+  Runs DB sync, all store/quiz/HTTP tests, lint, and build.
 - `npm test`
-  Tests the local access boundary and lesson flow using temporary SQLite databases.
+  Tests store isolation, quiz validation and scoring, rollback, and the local
+  HTTP boundary/lesson flow using temporary SQLite databases.
 - `npm run build`
   Type-checks and builds the frontend.
 - `npm run serve`
-  Serves the built frontend through the Express app.
+  Starts Express in production mode on port 8787. Build first to serve the frontend.
+- `npm run preview`
+  Previews the frontend build with Vite; it has no configured API proxy.
+  Use `npm run serve` to run the complete built app.
 - `npm run db:sync`
   Synchronizes SQLite with the current research and curriculum.
 - `npm run db:reset`
-  Recreates the database from seed data.
+  Deletes all local learner state and recreates the database from seed data.
+  Stop the app and [back up first](./docs/local-operations.md#back-up-learner-state).
 
 ## Current Product Boundary
 
