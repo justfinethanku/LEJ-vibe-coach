@@ -79,10 +79,28 @@ As the host repo evolves:
 3. the research and lesson pack are updated
 4. local learner state stays intact
 
-Follow [Local operations](./local-operations.md#refresh-curriculum) for backups
-and current refresh limitations. Sync currently upserts content but does not
-retire removed lessons, research, or questions; do not reset a database whose
-learner history you want to preserve.
+Follow [Local operations](./local-operations.md#refresh-curriculum) for backups.
+Startup and `npm run db:sync` upgrade existing databases in place and mark missing
+lessons, research documents, and quiz questions with `retired_at`. They never
+delete those rows. Returning content clears retirement and reuses the same IDs.
+Retired content is excluded from navigation, bootstrap lists, related research,
+and new quiz scoring. Direct lesson and research detail reads remain available
+by slug, including retained progress, comments, and recent attempts. Historical
+attempts and responses remain inspectable in SQLite, including joins to retired
+questions. Historical scores and totals are not recalculated.
+
+### Question identity
+
+Within a quiz (identified by lesson slug), a question keeps its ID while its
+prompt is unchanged; rewording it creates a new question and retires the old one.
+Reordering only changes display positions, so past responses stay attached to
+their original question text. Returning prompts reactivate their existing rows.
+Duplicate prompts match distinct existing rows in ascending ID order, once per
+seed occurrence. Options, correct answers, and explanations update in place for
+unchanged prompts; those fields are not versioned. Past responses retain their
+selected options and correctness, and past scores and totals stay unchanged.
+
+Do not reset a database whose learner history you want to preserve.
 
 ## Product Rule
 

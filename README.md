@@ -128,7 +128,7 @@ Other platforms and Node release lines were not tested in this setup pass.
    npm run verify
    ```
 
-   This creates `data/vibe-coach.sqlite` and runs DB sync, 27 behavior tests,
+   This creates `data/vibe-coach.sqlite` and runs DB sync, all behavior tests,
    lint, TypeScript checks, and the frontend build. The tests use temporary
    databases; DB sync uses this installation's learner database.
 

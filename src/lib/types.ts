@@ -58,6 +58,7 @@ export type LessonDetail = {
     summary: string
     goals: string[]
     content: string
+    retiredAt: string | null
     status: LessonStatus
     confidence: number
     quizAverage: number
@@ -100,6 +101,7 @@ export type ResearchDocumentDetail = {
   content: string
   sourcePath: string
   sourceUrl: string | null
+  retiredAt: string | null
 }
 
 export type QuizResult = {

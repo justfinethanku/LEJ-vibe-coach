@@ -39,12 +39,11 @@ with HTTP 403. The app has no remote-user authentication.
 4. Check the lesson path and research library, and confirm existing progress,
    comments, and quiz history remain visible.
 
-Startup and `db:sync` import research and upsert curriculum. They preserve
-learner state, but currently do not retire removed lessons, research documents,
-or quiz questions. Removed items can remain visible. Reordering/replacing quiz
-questions also needs care because sync identifies them by quiz and order.
-[LEJ-530](https://linear.app/contentionmedia/issue/LEJ-530) tracks reconciliation
-that preserves history. `db:reset` deletes learner history; it is not a refresh
+Startup and `db:sync` import research, update curriculum, and retire removed
+content while preserving learner state. Returning content reuses its existing
+rows. See [retirement and question identity](./embedded-install-mode.md#refresh-flow)
+for history access and the prompt-based question identity, including reordering and
+replacement behavior. `db:reset` deletes learner history; it is not a refresh
 procedure for an installation whose history you want to keep.
 
 ## Back up learner state
@@ -119,7 +118,7 @@ seeding again; it permanently removes history from the working database.
 | Page loads but bootstrap fails | Check the API terminal. Run `curl -f http://127.0.0.1:8787/api/bootstrap`; expect JSON containing lessons and research documents. Use `serve` rather than `preview` for the built app. |
 | Built server returns 404 at `/` but bootstrap works | Run `npm run build` from the engine root, then restart `npm run serve`. Express only registers the frontend when `dist` exists at startup. |
 | HTTP 403 from the API | Open the local HTTP URL; check Host/Origin values and avoid LAN/custom hostnames. |
-| Content edits are absent | Run `npm run db:sync` and restart. HTTP reads use SQLite; editing markdown alone does not refresh the running database. See the refresh limitation for removed content. |
+| Content edits are absent | Run `npm run db:sync` and restart. HTTP reads use SQLite; editing markdown alone does not refresh the running database. |
 | `npm run verify` fails | Read the first failing command: DB sync, tests, lint, or build. Sync errors can indicate missing research files or invalid curriculum. Fix that cause before retrying; reset deletes history. |
 
 Setup and these local procedures were exercised on Ubuntu ARM64 with Node

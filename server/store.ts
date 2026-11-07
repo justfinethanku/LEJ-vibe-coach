@@ -95,6 +95,7 @@ export const createCoachStore = (db: Database.Database, options: CoachStoreOptio
         source_path TEXT NOT NULL UNIQUE,
         source_url TEXT,
         content_hash TEXT NOT NULL,
+        retired_at TEXT,
         created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
         updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
       );
@@ -124,6 +125,7 @@ export const createCoachStore = (db: Database.Database, options: CoachStoreOptio
         goals_json TEXT NOT NULL,
         content TEXT NOT NULL,
         related_research_json TEXT NOT NULL,
+        retired_at TEXT,
         created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
         updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
       );
@@ -143,6 +145,7 @@ export const createCoachStore = (db: Database.Database, options: CoachStoreOptio
         options_json TEXT NOT NULL,
         correct_option TEXT NOT NULL,
         explanation TEXT NOT NULL,
+        retired_at TEXT,
         UNIQUE (quiz_id, order_index)
       );
 
@@ -189,6 +192,16 @@ export const createCoachStore = (db: Database.Database, options: CoachStoreOptio
       CREATE INDEX IF NOT EXISTS quiz_attempts_by_quiz
         ON quiz_attempts (quiz_id, created_at DESC);
     `)
+
+    // Upgrade existing learner databases in place; never rebuild history tables.
+    db.transaction(() => {
+      for (const table of ['lessons', 'research_documents', 'quiz_questions']) {
+        const columns = db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>
+        if (!columns.some((column) => column.name === 'retired_at')) {
+          db.exec(`ALTER TABLE ${table} ADD COLUMN retired_at TEXT`)
+        }
+      }
+    })()
   }
 
   const syncSeedData = () => {
@@ -203,6 +216,8 @@ export const createCoachStore = (db: Database.Database, options: CoachStoreOptio
             title = excluded.title,
             description = excluded.description,
             updated_at = excluded.updated_at
+          WHERE (projects.title, projects.description)
+            IS NOT (excluded.title, excluded.description)
         `,
       ).run({
         ...projectSeed,
@@ -219,6 +234,8 @@ export const createCoachStore = (db: Database.Database, options: CoachStoreOptio
             title = excluded.title,
             description = excluded.description,
             updated_at = excluded.updated_at
+          WHERE (learning_tracks.title, learning_tracks.description)
+            IS NOT (excluded.title, excluded.description)
         `,
       ).run({
         projectId,
@@ -266,7 +283,14 @@ export const createCoachStore = (db: Database.Database, options: CoachStoreOptio
             source_path = excluded.source_path,
             source_url = excluded.source_url,
             content_hash = excluded.content_hash,
+            retired_at = NULL,
             updated_at = excluded.updated_at
+          WHERE (research_documents.title, research_documents.summary,
+            research_documents.category, research_documents.content,
+            research_documents.source_path, research_documents.source_url,
+            research_documents.content_hash, research_documents.retired_at)
+            IS NOT (excluded.title, excluded.summary, excluded.category, excluded.content,
+              excluded.source_path, excluded.source_url, excluded.content_hash, NULL)
         `,
       )
 
@@ -334,7 +358,14 @@ export const createCoachStore = (db: Database.Database, options: CoachStoreOptio
             goals_json = excluded.goals_json,
             content = excluded.content,
             related_research_json = excluded.related_research_json,
+            retired_at = NULL,
             updated_at = excluded.updated_at
+          WHERE (lessons.title, lessons.stage, lessons.difficulty, lessons.order_index,
+            lessons.estimated_minutes, lessons.summary, lessons.goals_json,
+            lessons.content, lessons.related_research_json, lessons.retired_at)
+            IS NOT (excluded.title, excluded.stage, excluded.difficulty, excluded.order_index,
+              excluded.estimated_minutes, excluded.summary, excluded.goals_json,
+              excluded.content, excluded.related_research_json, NULL)
         `,
       )
 
@@ -348,7 +379,28 @@ export const createCoachStore = (db: Database.Database, options: CoachStoreOptio
         `,
       )
 
-      const upsertQuestion = db.prepare(
+      // Free every positive position before matching unchanged prompts. Retired
+      // rows keep unique negative positions so their text and responses survive.
+      const retireQuestions = db.prepare(`
+        UPDATE quiz_questions
+        SET order_index = -id, retired_at = COALESCE(retired_at, ?)
+        WHERE quiz_id = ?
+      `)
+      const findQuestion = db.prepare(`
+        SELECT id FROM quiz_questions
+        WHERE quiz_id = ? AND prompt = ? AND order_index < 0
+        ORDER BY id LIMIT 1
+      `)
+      const restoreQuestion = db.prepare(`
+        UPDATE quiz_questions SET
+          order_index = @orderIndex,
+          options_json = @optionsJson,
+          correct_option = @correctOption,
+          explanation = @explanation,
+          retired_at = NULL
+        WHERE id = @id
+      `)
+      const insertQuestion = db.prepare(
         `
           INSERT INTO quiz_questions (
             quiz_id,
@@ -366,11 +418,6 @@ export const createCoachStore = (db: Database.Database, options: CoachStoreOptio
             @correctOption,
             @explanation
           )
-          ON CONFLICT(quiz_id, order_index) DO UPDATE SET
-            prompt = excluded.prompt,
-            options_json = excluded.options_json,
-            correct_option = excluded.correct_option,
-            explanation = excluded.explanation
         `,
       )
 
@@ -406,19 +453,43 @@ export const createCoachStore = (db: Database.Database, options: CoachStoreOptio
         })
 
         const quizId = getQuizId(lessonId)
+        retireQuestions.run(timestamp, quizId)
         lesson.quizQuestions.forEach((question, index) => {
-          upsertQuestion.run({
+          const existing = findQuestion.get(quizId, question.prompt) as { id: number } | undefined
+          const values = {
             quizId,
             orderIndex: index + 1,
             prompt: question.prompt,
             optionsJson: JSON.stringify(question.options),
             correctOption: question.correctOption,
             explanation: question.explanation,
-          })
+          }
+          if (existing) {
+            restoreQuestion.run({ ...values, id: existing.id })
+          } else {
+            insertQuestion.run(values)
+          }
         })
 
         ensureProgress.run(lessonId, timestamp)
       }
+
+      const retireMissing = (table: 'lessons' | 'research_documents', slugs: string[]) => {
+        db.prepare(`
+          UPDATE ${table} SET retired_at = ?
+          WHERE project_id = ? AND retired_at IS NULL
+            AND slug NOT IN (SELECT value FROM json_each(?))
+        `).run(timestamp, projectId, JSON.stringify(slugs))
+      }
+      retireMissing('lessons', lessonSeeds.map((lesson) => lesson.slug))
+      retireMissing('research_documents', researchFiles.map(slugFromFileName))
+      db.prepare(`
+        UPDATE quiz_questions SET retired_at = ?
+        WHERE retired_at IS NULL AND quiz_id IN (
+          SELECT quizzes.id FROM quizzes JOIN lessons ON lessons.id = quizzes.lesson_id
+          WHERE lessons.project_id = ? AND lessons.retired_at IS NOT NULL
+        )
+      `).run(timestamp, projectId)
     })
 
     sync()
@@ -459,6 +530,7 @@ export const createCoachStore = (db: Database.Database, options: CoachStoreOptio
           ) AS followUpCount
         FROM lessons
         JOIN lesson_progress ON lesson_progress.lesson_id = lessons.id
+        WHERE lessons.retired_at IS NULL
         ORDER BY lessons.order_index
       `,
     ).all() as Array<{
@@ -480,6 +552,7 @@ export const createCoachStore = (db: Database.Database, options: CoachStoreOptio
       `
         SELECT slug, title, summary, category
         FROM research_documents
+        WHERE retired_at IS NULL
         ORDER BY title
       `,
     ).all() as Array<{
@@ -493,6 +566,9 @@ export const createCoachStore = (db: Database.Database, options: CoachStoreOptio
       `
         SELECT AVG(score) AS averageScore, COUNT(*) AS attemptCount
         FROM quiz_attempts
+        JOIN quizzes ON quizzes.id = quiz_attempts.quiz_id
+        JOIN lessons ON lessons.id = quizzes.lesson_id
+        WHERE lessons.retired_at IS NULL
       `,
     ).get() as { averageScore: number | null; attemptCount: number }
 
@@ -530,6 +606,7 @@ export const createCoachStore = (db: Database.Database, options: CoachStoreOptio
           lessons.summary,
           lessons.goals_json AS goalsJson,
           lessons.content,
+          lessons.retired_at AS retiredAt,
           lessons.related_research_json AS relatedResearchJson,
           lesson_progress.status,
           lesson_progress.confidence,
@@ -557,6 +634,7 @@ export const createCoachStore = (db: Database.Database, options: CoachStoreOptio
           summary: string
           goalsJson: string
           content: string
+          retiredAt: string | null
           relatedResearchJson: string
           status: LessonStatus
           confidence: number
@@ -578,7 +656,7 @@ export const createCoachStore = (db: Database.Database, options: CoachStoreOptio
       `
         SELECT id, order_index AS orderIndex, prompt, options_json AS optionsJson, explanation
         FROM quiz_questions
-        WHERE quiz_id = ?
+        WHERE quiz_id = ? AND retired_at IS NULL
         ORDER BY order_index
       `,
     ).all(lesson.quizId) as Array<{
@@ -627,6 +705,7 @@ export const createCoachStore = (db: Database.Database, options: CoachStoreOptio
                 SELECT slug, title, summary, category
                 FROM research_documents
                 WHERE slug IN (${relatedResearchSlugs.map(() => '?').join(', ')})
+                  AND retired_at IS NULL
                 ORDER BY title
               `,
             )
@@ -649,6 +728,7 @@ export const createCoachStore = (db: Database.Database, options: CoachStoreOptio
         summary: lesson.summary,
         goals: parseJson<string[]>(lesson.goalsJson),
         content: lesson.content,
+        retiredAt: lesson.retiredAt,
         status: lesson.status,
         confidence: lesson.confidence,
         quizAverage: lesson.quizAverage,
@@ -677,7 +757,8 @@ export const createCoachStore = (db: Database.Database, options: CoachStoreOptio
   const getResearchDocumentDetail = (slug: string) => {
     const document = db.prepare(
       `
-        SELECT slug, title, summary, category, content, source_path AS sourcePath, source_url AS sourceUrl
+        SELECT slug, title, summary, category, content, source_path AS sourcePath,
+          source_url AS sourceUrl, retired_at AS retiredAt
         FROM research_documents
         WHERE slug = ?
       `,
@@ -690,6 +771,7 @@ export const createCoachStore = (db: Database.Database, options: CoachStoreOptio
           content: string
           sourcePath: string
           sourceUrl: string | null
+          retiredAt: string | null
         }
       | undefined
 
@@ -761,7 +843,7 @@ export const createCoachStore = (db: Database.Database, options: CoachStoreOptio
       `
         SELECT id, prompt, options_json AS optionsJson, correct_option AS correctOption, explanation
         FROM quiz_questions
-        WHERE quiz_id = ?
+        WHERE quiz_id = ? AND retired_at IS NULL
         ORDER BY order_index
       `,
     ).all(quizId) as Array<{

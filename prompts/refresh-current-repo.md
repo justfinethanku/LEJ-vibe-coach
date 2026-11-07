@@ -22,6 +22,7 @@ Rules:
 - Do not wipe learner-state files.
 - Prefer targeted curriculum changes over broad rewrites.
 - Keep the research and lessons inspectable.
+- Rewording a question's prompt starts it fresh; keep prompts unchanged when only reordering.
 
 When you finish:
 
