@@ -95,6 +95,7 @@ export const createCoachStore = (db: Database.Database, options: CoachStoreOptio
         source_path TEXT NOT NULL UNIQUE,
         source_url TEXT,
         content_hash TEXT NOT NULL,
+        retired_at TEXT,
         created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
         updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
       );
@@ -124,6 +125,7 @@ export const createCoachStore = (db: Database.Database, options: CoachStoreOptio
         goals_json TEXT NOT NULL,
         content TEXT NOT NULL,
         related_research_json TEXT NOT NULL,
+        retired_at TEXT,
         created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
         updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
       );
@@ -143,6 +145,7 @@ export const createCoachStore = (db: Database.Database, options: CoachStoreOptio
         options_json TEXT NOT NULL,
         correct_option TEXT NOT NULL,
         explanation TEXT NOT NULL,
+        retired_at TEXT,
         UNIQUE (quiz_id, order_index)
       );
 
@@ -376,7 +379,28 @@ export const createCoachStore = (db: Database.Database, options: CoachStoreOptio
         `,
       )
 
-      const upsertQuestion = db.prepare(
+      // Free every positive position before matching unchanged prompts. Retired
+      // rows keep unique negative positions so their text and responses survive.
+      const retireQuestions = db.prepare(`
+        UPDATE quiz_questions
+        SET order_index = -id, retired_at = COALESCE(retired_at, ?)
+        WHERE quiz_id = ?
+      `)
+      const findQuestion = db.prepare(`
+        SELECT id FROM quiz_questions
+        WHERE quiz_id = ? AND prompt = ? AND order_index < 0
+        ORDER BY id LIMIT 1
+      `)
+      const restoreQuestion = db.prepare(`
+        UPDATE quiz_questions SET
+          order_index = @orderIndex,
+          options_json = @optionsJson,
+          correct_option = @correctOption,
+          explanation = @explanation,
+          retired_at = NULL
+        WHERE id = @id
+      `)
+      const insertQuestion = db.prepare(
         `
           INSERT INTO quiz_questions (
             quiz_id,
@@ -394,12 +418,6 @@ export const createCoachStore = (db: Database.Database, options: CoachStoreOptio
             @correctOption,
             @explanation
           )
-          ON CONFLICT(quiz_id, order_index) DO UPDATE SET
-            prompt = excluded.prompt,
-            options_json = excluded.options_json,
-            correct_option = excluded.correct_option,
-            explanation = excluded.explanation,
-            retired_at = NULL
         `,
       )
 
@@ -435,35 +453,36 @@ export const createCoachStore = (db: Database.Database, options: CoachStoreOptio
         })
 
         const quizId = getQuizId(lessonId)
+        retireQuestions.run(timestamp, quizId)
         lesson.quizQuestions.forEach((question, index) => {
-          upsertQuestion.run({
+          const existing = findQuestion.get(quizId, question.prompt) as { id: number } | undefined
+          const values = {
             quizId,
             orderIndex: index + 1,
             prompt: question.prompt,
             optionsJson: JSON.stringify(question.options),
             correctOption: question.correctOption,
             explanation: question.explanation,
-          })
+          }
+          if (existing) {
+            restoreQuestion.run({ ...values, id: existing.id })
+          } else {
+            insertQuestion.run(values)
+          }
         })
-        db.prepare(`
-          UPDATE quiz_questions SET retired_at = ?
-          WHERE quiz_id = ? AND order_index > ? AND retired_at IS NULL
-        `).run(timestamp, quizId, lesson.quizQuestions.length)
 
         ensureProgress.run(lessonId, timestamp)
       }
 
-      const retireMissing = (table: 'lessons' | 'research_documents', slugs: Set<string>) => {
-        const activeRows = db.prepare(`
-          SELECT id, slug FROM ${table} WHERE project_id = ? AND retired_at IS NULL
-        `).all(projectId) as Array<{ id: number; slug: string }>
-        const retire = db.prepare(`UPDATE ${table} SET retired_at = ? WHERE id = ?`)
-        for (const row of activeRows) {
-          if (!slugs.has(row.slug)) retire.run(timestamp, row.id)
-        }
+      const retireMissing = (table: 'lessons' | 'research_documents', slugs: string[]) => {
+        db.prepare(`
+          UPDATE ${table} SET retired_at = ?
+          WHERE project_id = ? AND retired_at IS NULL
+            AND slug NOT IN (SELECT value FROM json_each(?))
+        `).run(timestamp, projectId, JSON.stringify(slugs))
       }
-      retireMissing('lessons', new Set(lessonSeeds.map((lesson) => lesson.slug)))
-      retireMissing('research_documents', new Set(researchFiles.map(slugFromFileName)))
+      retireMissing('lessons', lessonSeeds.map((lesson) => lesson.slug))
+      retireMissing('research_documents', researchFiles.map(slugFromFileName))
       db.prepare(`
         UPDATE quiz_questions SET retired_at = ?
         WHERE retired_at IS NULL AND quiz_id IN (
@@ -547,6 +566,9 @@ export const createCoachStore = (db: Database.Database, options: CoachStoreOptio
       `
         SELECT AVG(score) AS averageScore, COUNT(*) AS attemptCount
         FROM quiz_attempts
+        JOIN quizzes ON quizzes.id = quiz_attempts.quiz_id
+        JOIN lessons ON lessons.id = quizzes.lesson_id
+        WHERE lessons.retired_at IS NULL
       `,
     ).get() as { averageScore: number | null; attemptCount: number }
 
@@ -822,10 +844,6 @@ export const createCoachStore = (db: Database.Database, options: CoachStoreOptio
         SELECT id, prompt, options_json AS optionsJson, correct_option AS correctOption, explanation
         FROM quiz_questions
         WHERE quiz_id = ? AND retired_at IS NULL
-          AND EXISTS (
-            SELECT 1 FROM quizzes JOIN lessons ON lessons.id = quizzes.lesson_id
-            WHERE quizzes.id = quiz_questions.quiz_id AND lessons.retired_at IS NULL
-          )
         ORDER BY order_index
       `,
     ).all(quizId) as Array<{

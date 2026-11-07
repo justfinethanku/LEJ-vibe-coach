@@ -91,16 +91,14 @@ questions. Historical scores and totals are not recalculated.
 
 ### Question identity
 
-The seed format has no question ID. A question keeps the existing key of its
-quiz (identified by lesson slug) and one-based position in `quizQuestions`.
-Editing or replacing a question in that position updates the same row. Reordering
-questions updates the contents of those positions; IDs do not follow the prompts.
-Removing a middle question shifts later questions into earlier positions and
-retires the unused trailing positions. Restoring a position reactivates its ID.
-Past responses retain their selected options and correctness, but question text
-is not versioned: joining history to an edited position shows its current text.
-Keep existing positions when you want historical question meaning to stay stable;
-use a new lesson slug for a separate replacement quiz.
+Within a quiz (identified by lesson slug), a question keeps its ID while its
+prompt is unchanged; rewording it creates a new question and retires the old one.
+Reordering only changes display positions, so past responses stay attached to
+their original question text. Returning prompts reactivate their existing rows.
+Duplicate prompts match distinct existing rows in ascending ID order, once per
+seed occurrence. Options, correct answers, and explanations update in place for
+unchanged prompts; those fields are not versioned. Past responses retain their
+selected options and correctness, and past scores and totals stay unchanged.
 
 Do not reset a database whose learner history you want to preserve.
 

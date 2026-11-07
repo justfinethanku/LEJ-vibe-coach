@@ -42,7 +42,7 @@ with HTTP 403. The app has no remote-user authentication.
 Startup and `db:sync` import research, update curriculum, and retire removed
 content while preserving learner state. Returning content reuses its existing
 rows. See [retirement and question identity](./embedded-install-mode.md#refresh-flow)
-for history access and the position-based quiz key, including reordering and
+for history access and the prompt-based question identity, including reordering and
 replacement behavior. `db:reset` deletes learner history; it is not a refresh
 procedure for an installation whose history you want to keep.
 

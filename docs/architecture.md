@@ -112,8 +112,9 @@ research directories, rather than sharing one database between projects.
 
 The existing server and database CLI commands use `server/db.ts` as their local
 setup module. Startup and `db:sync` explicitly initialize the schema and run the
-seed transaction. The transaction imports research and upserts curriculum while
-preserving progress, comments and quiz history. Request handlers then read from
+seed transaction. The transaction imports research, updates current curriculum,
+and retires removed content while preserving progress, comments and quiz history.
+Dashboard quiz averages and attempt counts cover active lessons only. Request handlers then read from
 SQLite; they do not reread markdown for each request. Quiz submissions write the
 attempt, responses and progress aggregates in one transaction.
 
@@ -138,6 +139,7 @@ Stores research imported from markdown source files with:
 - content
 - source path
 - content hash
+- `retired_at` (nullable; retired documents stay readable by slug)
 
 ### `learning_tracks`
 
@@ -153,6 +155,7 @@ Stores:
 - learning goals
 - lesson markdown
 - related research references
+- `retired_at` (nullable; retired lessons retain progress, comments, and attempts)
 
 ### `quizzes`
 
@@ -166,6 +169,14 @@ Stores:
 - answer options
 - correct option
 - explanation
+- `retired_at` (nullable; retired questions retain their text and responses)
+
+Questions match by unchanged prompt within a quiz, independent of display order.
+Reworded prompts create new rows. Sync temporarily assigns negative `order_index`
+values based on row IDs, then assigns positive display positions to matched or
+new questions, preserving `UNIQUE (quiz_id, order_index)`. Unmatched rows stay
+retired at negative positions. Duplicate prompts match once per seed occurrence
+in ascending ID order. See [question identity](./embedded-install-mode.md#question-identity).
 
 ### `lesson_progress`
 
