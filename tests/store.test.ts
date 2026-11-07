@@ -146,6 +146,180 @@ test('failed research import rolls back seed changes and leaves the caller conne
   assert.equal(connection.inTransaction, false)
 })
 
+test('refresh retires missing curriculum, preserves history, and restores returning content', (t) => {
+  t.mock.timers.enable({ apis: ['Date'], now: Date.parse('2026-01-01T00:00:00Z') })
+  const directory = researchFixture()
+  const connection = new Database(':memory:')
+  t.after(() => {
+    connection.close()
+    rmSync(directory, { recursive: true, force: true })
+  })
+  const options = curriculum(directory)
+  options.lessons[0].relatedResearchSlugs.push('removed')
+  options.lessons[0].quizQuestions = [1, 2, 3].map((number) => ({
+    prompt: `Question ${number}`, options: ['Right', 'Wrong'],
+    correctOption: 'Right', explanation: `Reason ${number}`,
+  }))
+  const removedLesson = structuredClone(options.lessons[0])
+  removedLesson.slug = 'removed-lesson'
+  removedLesson.orderIndex = 2
+  options.lessons.push(removedLesson)
+  const removedPath = join(directory, 'removed.md')
+  writeFileSync(removedPath, '# Removed research\nKeep the imported copy.')
+  const store = createCoachStore(connection, options)
+  store.initializeDatabase()
+  store.syncSeedData()
+  for (const lesson of options.lessons) {
+    store.updateLessonProgress(lesson.slug, 'completed', 4)
+    store.addLessonComment(lesson.slug, 'Keep this learner comment.', 'want_more_depth')
+    const { quiz } = store.getLessonDetail(lesson.slug)!
+    store.submitQuizAnswers(quiz.id, quiz.questions.map(({ id }) => ({
+      questionId: id, selectedOption: 'Right',
+    })))
+  }
+  const before = store.getLessonDetail('orientation')!
+  const removedBefore = store.getLessonDetail(removedLesson.slug)!
+  const learnerSnapshot = () => ['lesson_progress', 'lesson_comments', 'quiz_attempts', 'quiz_responses']
+    .map((table) => connection.prepare(`SELECT * FROM ${table} ORDER BY id`).all())
+  const history = learnerSnapshot()
+  const removedQuestion = options.lessons[0].quizQuestions.pop()!
+  options.lessons.pop()
+  rmSync(removedPath)
+  t.mock.timers.tick(1000)
+  store.syncSeedData()
+
+  const bootstrap = store.getBootstrapData()
+  assert.deepEqual(bootstrap.lessons.map(({ slug }) => slug), ['orientation'])
+  assert.deepEqual(bootstrap.researchDocuments.map(({ slug }) => slug), ['notes'])
+  assert.equal(bootstrap.dashboard.totalLessons, 1)
+  assert.equal(bootstrap.dashboard.completedLessons, 1)
+  assert.equal(bootstrap.dashboard.nextRecommendedLesson, 'orientation')
+  const refreshed = store.getLessonDetail('orientation')!
+  assert.deepEqual(refreshed.quiz.questions.map(({ id }) => id), before.quiz.questions.slice(0, 2).map(({ id }) => id))
+  assert.deepEqual(refreshed.relatedResearch.map(({ slug }) => slug), ['notes'])
+  assert.deepEqual(learnerSnapshot(), history)
+  assert.equal(store.getLessonDetail(removedLesson.slug)!.lesson.status, 'completed')
+  assert.ok(store.getLessonDetail(removedLesson.slug)!.lesson.retiredAt)
+  assert.deepEqual(store.getLessonDetail(removedLesson.slug)!.comments, removedBefore.comments)
+  assert.deepEqual(store.getLessonDetail(removedLesson.slug)!.quiz.recentAttempts, removedBefore.quiz.recentAttempts)
+  assert.deepEqual(store.getLessonDetail(removedLesson.slug)!.quiz.questions, [])
+  assert.ok(store.getResearchDocumentDetail('removed')!.retiredAt)
+  assert.match(store.getResearchDocumentDetail('removed')!.content, /Keep the imported copy/)
+  assert.deepEqual(connection.prepare(`
+    SELECT quiz_questions.prompt, quiz_responses.selected_option, quiz_responses.is_correct
+    FROM quiz_responses JOIN quiz_questions ON quiz_questions.id = quiz_responses.question_id
+    WHERE quiz_questions.id = ?
+  `).all(before.quiz.questions[2].id), [{ prompt: 'Question 3', selected_option: 'Right', is_correct: 1 }])
+  assert.throws(() => store.submitQuizAnswers(removedBefore.quiz.id, []), /Quiz not found/)
+  assert.throws(() => store.submitQuizAnswers(before.quiz.id,
+    before.quiz.questions.map(({ id }) => ({ questionId: id, selectedOption: 'Right' }))), /exactly once/)
+  assert.throws(() => store.submitQuizAnswers(before.quiz.id, [
+    { questionId: before.quiz.questions[0].id, selectedOption: 'Right' },
+    { questionId: before.quiz.questions[2].id, selectedOption: 'Right' },
+  ]), /exactly once/)
+  assert.deepEqual(learnerSnapshot(), history)
+  const result = store.submitQuizAnswers(before.quiz.id, refreshed.quiz.questions.map(({ id }, index) => ({
+    questionId: id, selectedOption: index === 0 ? 'Right' : 'Wrong',
+  })))
+  assert.equal(result.totalQuestions, 2)
+  assert.equal(result.score, 50)
+  assert.equal(result.correctCount, 1)
+  assert.equal(store.getLessonDetail('orientation')!.quiz.recentAttempts.find((attempt) => attempt.totalQuestions === 3)!.score, 100)
+
+  const snapshot = () => ['projects', 'learning_tracks', 'lessons', 'research_documents', 'quizzes', 'quiz_questions']
+    .map((table) => connection.prepare(`SELECT * FROM ${table} ORDER BY id`).all())
+    .concat(learnerSnapshot())
+  const afterRefresh = snapshot()
+  t.mock.timers.tick(1000)
+  store.syncSeedData()
+  assert.deepEqual(snapshot(), afterRefresh)
+
+  // An empty curriculum retires everything; restoring seeds reuses all IDs.
+  options.lessons.length = 0
+  rmSync(join(directory, 'notes.md'))
+  store.syncSeedData()
+  assert.deepEqual(store.getBootstrapData().lessons, [])
+  assert.deepEqual(store.getBootstrapData().researchDocuments, [])
+  assert.throws(() => store.submitQuizAnswers(before.quiz.id, []), /Quiz not found/)
+  const restoredLesson = curriculum(directory).lessons[0]
+  restoredLesson.quizQuestions = [
+    ...removedLesson.quizQuestions.slice(0, 2), removedQuestion,
+  ]
+  options.lessons.push(restoredLesson, removedLesson)
+  writeFileSync(join(directory, 'notes.md'), '# Boundary notes\nOriginal research.')
+  writeFileSync(removedPath, '# Removed research\nKeep the imported copy.')
+  store.syncSeedData()
+  const restored = store.getLessonDetail('orientation')!
+  assert.equal(restored.lesson.retiredAt, null)
+  assert.deepEqual(restored.quiz.questions.map(({ id }) => id), before.quiz.questions.map(({ id }) => id))
+  assert.equal(store.getLessonDetail(removedLesson.slug)!.lesson.retiredAt, null)
+  assert.deepEqual(store.getLessonDetail(removedLesson.slug)!.quiz, removedBefore.quiz)
+  assert.equal(store.getResearchDocumentDetail('removed')!.retiredAt, null)
+  assert.deepEqual(connection.pragma('foreign_key_check'), [])
+})
+
+test('initialization upgrades a populated legacy schema without changing learner rows', (t) => {
+  const directory = researchFixture()
+  const connection = new Database(':memory:')
+  t.after(() => {
+    connection.close()
+    rmSync(directory, { recursive: true, force: true })
+  })
+  const store = createCoachStore(connection, curriculum(directory))
+  store.initializeDatabase()
+  store.syncSeedData()
+  store.addLessonComment('orientation', 'Keep this legacy learner note.', 'clear')
+  const before = store.getLessonDetail('orientation')!
+  store.submitQuizAnswers(before.quiz.id, [{ questionId: before.quiz.questions[0].id, selectedOption: 'This one' }])
+  const history = connection.prepare('SELECT * FROM quiz_responses').all()
+  // Recreate the pre-retirement layout, including populated foreign keys.
+  for (const table of ['lessons', 'research_documents', 'quiz_questions']) {
+    connection.exec(`ALTER TABLE ${table} DROP COLUMN retired_at`)
+  }
+  store.initializeDatabase()
+  store.initializeDatabase()
+  assert.deepEqual(connection.prepare('SELECT * FROM quiz_responses').all(), history)
+  assert.equal(store.getLessonDetail('orientation')!.lesson.retiredAt, null)
+  assert.deepEqual(store.getLessonDetail('orientation')!.comments, before.comments)
+  assert.equal(store.getLessonDetail('orientation')!.quiz.questions[0].id, before.quiz.questions[0].id)
+  assert.equal(store.getLessonDetail('orientation')!.quiz.recentAttempts.length, 1)
+  assert.deepEqual(connection.pragma('foreign_key_check'), [])
+})
+
+test('question identity follows the quiz position when questions are reordered or replaced', (t) => {
+  const directory = researchFixture()
+  const connection = new Database(':memory:')
+  t.after(() => {
+    connection.close()
+    rmSync(directory, { recursive: true, force: true })
+  })
+  const options = curriculum(directory)
+  options.lessons[0].quizQuestions.push({
+    prompt: 'A second question', options: ['Yes', 'No'], correctOption: 'Yes', explanation: 'Reason',
+  })
+  const store = createCoachStore(connection, options)
+  store.initializeDatabase()
+  store.syncSeedData()
+  const before = store.getLessonDetail('orientation')!
+  store.submitQuizAnswers(before.quiz.id, before.quiz.questions.map(({ id, options }) => ({
+    questionId: id, selectedOption: options[0],
+  })))
+  const history = connection.prepare('SELECT * FROM quiz_responses ORDER BY id').all()
+  options.lessons[0].quizQuestions.reverse()
+  store.syncSeedData()
+  const reordered = store.getLessonDetail('orientation')!
+  assert.deepEqual(reordered.quiz.questions.map(({ id }) => id), before.quiz.questions.map(({ id }) => id))
+  assert.deepEqual(reordered.quiz.questions.map(({ prompt }) => prompt), before.quiz.questions.map(({ prompt }) => prompt).reverse())
+  options.lessons[0].quizQuestions[0] = {
+    prompt: 'Replacement', options: ['New', 'Old'], correctOption: 'New', explanation: 'New reason',
+  }
+  store.syncSeedData()
+  assert.equal(store.getLessonDetail('orientation')!.quiz.questions[0].id, before.quiz.questions[0].id)
+  assert.equal(store.getLessonDetail('orientation')!.quiz.questions[0].prompt, 'Replacement')
+  assert.deepEqual(connection.prepare('SELECT * FROM quiz_responses ORDER BY id').all(), history)
+  assert.equal(store.getLessonDetail('orientation')!.quiz.recentAttempts[0].score, 100)
+})
+
 
 test('the reusable store loads without sample project files or creating a data directory', (t) => {
   const directory = mkdtempSync(join(tmpdir(), 'vibe-coach-engine-'))
