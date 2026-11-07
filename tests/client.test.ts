@@ -26,7 +26,9 @@ Object.assign(globalThis, {
   HTMLElement: dom.window.HTMLElement, HTMLInputElement: dom.window.HTMLInputElement,
   IS_REACT_ACT_ENVIRONMENT: true,
 })
-const { render, fireEvent, waitFor, act, cleanup } = await import('@testing-library/react')
+const { render, fireEvent, waitFor, act, cleanup, configure } = await import('@testing-library/react')
+// Shared ARM audit hosts can take longer than the default second to mount.
+configure({ asyncUtilTimeout: 5000 })
 const { default: App } = await tsImport('../src/App.tsx', {
   parentURL: import.meta.url, tsconfig: fileURLToPath(new URL('../tsconfig.app.json', import.meta.url)),
 })
@@ -64,6 +66,8 @@ async function fixture(t: TestContext) {
   let failDashboard = false
   let failWrite = false
   let failLesson: string | null = null
+  const lessonGates: Array<ReturnType<typeof deferred<void>>> = []
+  let lessonReads = 0
   let writeCount = 0
   let written = false
   const json = (value: unknown, status = 200) => new Response(JSON.stringify(value), { status })
@@ -93,6 +97,9 @@ async function fixture(t: TestContext) {
       return snapshot
     }
     if (path[2] === 'lessons') {
+      lessonReads++
+      const held = lessonGates.shift()
+      if (held) await held.promise
       if (failLesson === path[3]) return json({ error: 'Lesson unavailable.' }, 503)
       return json(store.getLessonDetail(path[3]))
     }
@@ -108,7 +115,9 @@ async function fixture(t: TestContext) {
     holdDashboard: () => { const held = deferred<void>(); dashboardGates.push(held); return held },
     failDashboard: () => { failDashboard = true },
     failWrite: () => { failWrite = true },
-    failLesson: (slug: string) => { failLesson = slug },
+    failLesson: (slug: string | null) => { failLesson = slug },
+    holdLesson: () => { const held = deferred<void>(); lessonGates.push(held); return held },
+    lessonReads: () => lessonReads,
     release: async () => { await act(async () => { gate.resolve(new Response(null, { status: 204 })) }) },
     waitWritten: () => waitFor(() => assert.equal(written, true)),
     writes: () => writeCount,
@@ -295,4 +304,134 @@ test('normal learner flow preserves scoring, completion, notes and dashboard beh
   assert.equal(detail.comments.length, 1)
   await waitFor(() => assert.equal(f.ui.container.querySelector('.metric-card strong')?.textContent, '50%'))
   assert.equal(f.store.getBootstrapData().dashboard.averageQuizScore, 50)
+})
+
+test('failed lesson load can be retried once at a time without leaving the lesson', async (t) => {
+  const f = await fixture(t)
+  f.failLesson('B')
+  fireEvent.click(f.ui.getByRole('button', { name: /^2\. Lesson B/ }))
+  await f.ui.findByRole('alert')
+  const retry = f.ui.getByRole('button', { name: 'Retry loading lesson' })
+  retry.focus()
+  const held = f.holdLesson()
+  const before = f.lessonReads()
+  fireEvent.click(retry)
+  fireEvent.click(retry)
+  await waitFor(() => assert.equal(f.lessonReads(), before + 1))
+  assert.equal(retry.getAttribute('aria-disabled'), 'true')
+  assert.ok(document.activeElement === retry)
+  assert.match(f.ui.getByRole('status').textContent!, /Retrying lesson/)
+  await act(async () => { held.resolve() })
+  await f.ui.findByRole('alert')
+  assert.ok(document.activeElement === retry)
+  assert.equal(retry.getAttribute('aria-disabled'), 'false')
+  assert.doesNotMatch(f.ui.getByRole('status').textContent!, /Retrying/)
+  f.failLesson(null)
+  fireEvent.click(retry)
+  await f.ui.findByRole('heading', { name: 'Lesson B' })
+  await waitFor(() => assert.equal(document.activeElement?.textContent, 'Lesson B'))
+  assert.equal(Boolean(f.ui.queryByRole('alert')), false)
+  assert.equal(Boolean(f.ui.queryByRole('button', { name: 'Retry loading lesson' })), false)
+  assert.equal(f.writes(), 0)
+})
+
+test('replacement announces cleared quiz state and restores focus from a removed answer', async (t) => {
+  const f = await fixture(t)
+  f.delayWrite()
+  await startWrite(f, 'progress')
+  const oldRadio = f.ui.getByRole('radio', { name: 'Yes' })
+  fireEvent.click(oldRadio)
+  oldRadio.focus()
+  f.options.lessons[0].quizQuestions[0].correctOption = 'No'
+  f.store.syncSeedData()
+  // The delayed POST already captured the old version; a second save reads
+  // the replacement while focus remains on the earlier answer.
+  await f.release()
+  fireEvent.click(f.ui.getByRole('button', { name: 'Save progress' }))
+  await waitFor(() => assert.equal(oldRadio.isConnected, false))
+  assert.match(f.ui.getByRole('status').textContent!, /Quiz questions changed.*cleared.*Review/i)
+  assert.equal(document.activeElement?.textContent, 'Quiz A')
+  assert.equal((f.ui.getByRole('radio', { name: 'Yes' }) as HTMLInputElement).checked, false)
+  assert.equal(f.store.getLessonDetail('A')!.quiz.recentAttempts.length, 0)
+})
+
+test('replacement notice preserves an unrelated note draft and its focus, including after save failure', async (t) => {
+  const f = await fixture(t)
+  f.delayWrite()
+  await startWrite(f, 'progress')
+  f.options.lessons[0].quizQuestions[0].correctOption = 'No'
+  f.store.syncSeedData()
+  await f.release()
+  fireEvent.click(f.ui.getByRole('button', { name: 'Save progress' }))
+  const draft = f.ui.getByRole('textbox') as HTMLTextAreaElement
+  note(f, 'Keep this draft and the keyboard here.')
+  draft.focus()
+  await waitFor(() => assert.match(f.ui.getByRole('status').textContent!, /Quiz questions changed/))
+  assert.ok(document.activeElement === draft)
+  assert.equal(draft.value, 'Keep this draft and the keyboard here.')
+  f.failWrite()
+  fireEvent.click(f.ui.getByRole('button', { name: 'Save note' }))
+  await f.ui.findByText('Write refused.')
+  assert.match(f.ui.getByRole('status').textContent!, /Quiz questions changed/)
+  assert.ok(document.activeElement === draft)
+})
+
+test('unchanged grading refresh keeps focused answer and has no replacement notice', async (t) => {
+  const f = await fixture(t)
+  f.delayWrite()
+  await startWrite(f, 'progress')
+  const radio = f.ui.getByRole('radio', { name: 'Yes' }) as HTMLInputElement
+  fireEvent.click(radio)
+  radio.focus()
+  await f.release()
+  assert.ok(document.activeElement === radio)
+  assert.equal(radio.checked, true)
+  assert.doesNotMatch(f.ui.getByRole('status').textContent!, /Quiz questions changed/)
+})
+
+test('replacement after a committed quiz labels its score as the previous version', async (t) => {
+  const f = await fixture(t)
+  f.delayWrite()
+  await startWrite(f, 'quiz')
+  f.options.lessons[0].quizQuestions[0].correctOption = 'No'
+  f.store.syncSeedData()
+  await f.release()
+  assert.match(f.ui.getByRole('status').textContent!, /Previous quiz scored 100%.*Quiz questions changed/)
+  assert.equal(Boolean(f.ui.queryByText('1/1 correct')), false)
+  assert.equal(f.store.getLessonDetail('A')!.quiz.recentAttempts.length, 1)
+})
+
+test('hidden replacement cannot pull focus away from the research document', async (t) => {
+  const f = await fixture(t)
+  f.options.lessons[0].quizQuestions[0].correctOption = 'No'
+  f.store.syncSeedData()
+  f.delayWrite()
+  await startWrite(f, 'progress')
+  f.ui.getByRole('radio', { name: 'Yes' }).focus()
+  fireEvent.click(f.ui.getAllByRole('button', { name: /^Research notes/ })[0])
+  await waitFor(() => assert.equal(document.activeElement?.textContent, 'Research notes'))
+  await f.release()
+  assert.equal(document.activeElement?.textContent, 'Research notes')
+  fireEvent.click(f.ui.getByRole('button', { name: 'Back to lesson' }))
+  await waitFor(() => assert.equal(document.activeElement?.textContent, 'Lesson A'))
+  assert.match(f.ui.getByRole('status').textContent!, /Quiz questions changed/)
+})
+
+test('leaving a pending retry ignores its late success and focus request', async (t) => {
+  const f = await fixture(t)
+  f.failLesson('B')
+  fireEvent.click(f.ui.getByRole('button', { name: /^2\. Lesson B/ }))
+  await f.ui.findByRole('alert')
+  f.failLesson(null)
+  const held = f.holdLesson()
+  const retry = f.ui.getByRole('button', { name: 'Retry loading lesson' })
+  fireEvent.click(retry)
+  await select(f, 'A')
+  note(f, 'Keep the new lesson draft after retry.')
+  const draft = f.ui.getByRole('textbox') as HTMLTextAreaElement
+  draft.focus()
+  await act(async () => { held.resolve() })
+  assert.ok(document.activeElement === draft)
+  assert.equal(draft.value, 'Keep the new lesson draft after retry.')
+  assert.equal(Boolean(f.ui.queryByRole('heading', { name: 'Lesson B' })), false)
 })
