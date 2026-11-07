@@ -171,12 +171,14 @@ Stores:
 - explanation
 - `retired_at` (nullable; retired questions retain their text and responses)
 
-Questions match by unchanged prompt within a quiz, independent of display order.
-Reworded prompts create new rows. Sync temporarily assigns negative `order_index`
-values based on row IDs, then assigns positive display positions to matched or
-new questions, preserving `UNIQUE (quiz_id, order_index)`. Unmatched rows stay
-retired at negative positions. Duplicate prompts match once per seed occurrence
-in ascending ID order. See [question identity](./embedded-install-mode.md#question-identity).
+Questions match by prompt, ordered options, and correct answer within a quiz,
+independent of question display order. A grading change creates a new row so stale
+submissions cannot be scored against it. Explanation-only edits retain identity.
+Sync temporarily assigns negative `order_index` values before restoring active
+questions to positive positions; retired rows preserve their text, choices, answer
+keys, and responses. Exact returning versions reuse their IDs. Identical duplicates
+match once per seed occurrence in ascending ID order.
+See [question identity](./embedded-install-mode.md#question-identity).
 
 ### `lesson_progress`
 

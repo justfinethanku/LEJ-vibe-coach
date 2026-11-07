@@ -92,13 +92,22 @@ questions. Historical scores and totals are not recalculated.
 ### Question identity
 
 Within a quiz (identified by lesson slug), a question keeps its ID while its
-prompt is unchanged; rewording it creates a new question and retires the old one.
-Reordering only changes display positions, so past responses stay attached to
-their original question text. Returning prompts reactivate their existing rows.
-Duplicate prompts match distinct existing rows in ascending ID order, once per
-seed occurrence. Options, correct answers, and explanations update in place for
-unchanged prompts; those fields are not versioned. Past responses retain their
-selected options and correctness, and past scores and totals stay unchanged.
+prompt, ordered answer options, and correct answer are unchanged. Changing any
+of those fields creates a new question and retires the old one, preserving the
+original choices and answer key alongside historical responses. Reordering whole
+questions only changes display positions. Returning to the exact earlier grading
+content reactivates its existing row. Duplicate questions with identical grading
+content match distinct rows in ascending ID order, once per seed occurrence.
+
+Explanations can improve in place without changing question IDs. Past scores,
+selected answers, correctness, and totals are not recalculated. Changes already
+made in place by an earlier engine version cannot be reconstructed automatically.
+
+A page opened before a grading change cannot submit the retired question IDs.
+If submission says the quiz may have changed, reload the lesson, review the new
+questions, and answer them again. Rejection does not save an attempt or change
+progress. Quiz validation and writes use one database transaction, and a failed
+note-progress update rolls back the note too.
 
 Do not reset a database whose learner history you want to preserve.
 
