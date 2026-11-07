@@ -122,6 +122,38 @@ attempt, responses and progress aggregates in one transaction.
 quiz scoring and rollback after a failed research import. The HTTP tests exercise
 the default local setup through real server processes. Run both with `npm test`.
 
+## Browser state ownership
+
+[`src/App.tsx`](../src/App.tsx) owns project/dashboard data, navigation, and the
+research view. Dashboard requests carry a sequence number; a late older read
+cannot overwrite a newer dashboard. Unmounted app instances discard their reads.
+
+[`src/LessonWorkspace.tsx`](../src/LessonWorkspace.tsx) owns one lesson visit:
+its detail, progress draft, note draft, quiz answers/result, pending mutation,
+and feedback. App keys the component by lesson slug. Navigating to another lesson
+ends the visit; late responses cannot publish into the new lesson, including a
+later visit to the original slug. Opening research hides the existing workspace
+without ending its visit, preserving drafts and restoring heading focus on return.
+
+One pending mutation serializes progress, note, and quiz writes within a visit.
+Progress and note responses already contain updated lesson detail, so the UI
+uses that response directly. Quiz results are retained before fetching updated
+lesson detail. A failed follow-up read reports the acknowledged save separately
+from the refresh failure. It does not turn a successful write into a failed save.
+Edits made while a save is pending remain drafts. Refreshed question IDs/options
+invalidate old quiz selections and feedback while preserving the note draft.
+
+[`tests/client.test.ts`](../tests/client.test.ts) renders the real app in JSDOM
+with delayed transport responses and an isolated SQLite store. It checks navigation
+races, same-slug return visits, draft edits during writes, failed refreshes,
+changed grading, focus, mutation ownership, and the normal learner flow. Run it
+with `npm test`; the production build validates CSS imports separately. These tests
+do not measure rendered layout or human screen-reader speech.
+
+Unsent drafts live in memory and are discarded when leaving a lesson or reloading
+the page. A write whose HTTP acknowledgment is lost still has an unknown outcome;
+this design does not provide server-side replay deduplication.
+
 ## Schema
 
 ### `projects`
