@@ -379,8 +379,8 @@ export const createCoachStore = (db: Database.Database, options: CoachStoreOptio
         `,
       )
 
-      // Free every positive position before matching unchanged prompts. Retired
-      // rows keep unique negative positions so their text and responses survive.
+      // Match prompt, ordered choices and answer key so an old page cannot submit
+      // against changed grading. Retired rows preserve their original answers.
       const retireQuestions = db.prepare(`
         UPDATE quiz_questions
         SET order_index = -id, retired_at = COALESCE(retired_at, ?)
@@ -388,7 +388,8 @@ export const createCoachStore = (db: Database.Database, options: CoachStoreOptio
       `)
       const findQuestion = db.prepare(`
         SELECT id FROM quiz_questions
-        WHERE quiz_id = ? AND prompt = ? AND order_index < 0
+        WHERE quiz_id = ? AND prompt = ? AND options_json = ? AND correct_option = ?
+          AND order_index < 0
         ORDER BY id LIMIT 1
       `)
       const restoreQuestion = db.prepare(`
@@ -455,7 +456,9 @@ export const createCoachStore = (db: Database.Database, options: CoachStoreOptio
         const quizId = getQuizId(lessonId)
         retireQuestions.run(timestamp, quizId)
         lesson.quizQuestions.forEach((question, index) => {
-          const existing = findQuestion.get(quizId, question.prompt) as { id: number } | undefined
+          const existing = findQuestion.get(
+            quizId, question.prompt, JSON.stringify(question.options), question.correctOption,
+          ) as { id: number } | undefined
           const values = {
             quizId,
             orderIndex: index + 1,
@@ -814,23 +817,26 @@ export const createCoachStore = (db: Database.Database, options: CoachStoreOptio
     body: string,
     understandingState: UnderstandingState,
   ) => {
-    const lessonId = getLessonId(slug)
-    db.prepare(
-      `
-        INSERT INTO lesson_comments (lesson_id, body, understanding_state)
-        VALUES (?, ?, ?)
-      `,
-    ).run(lessonId, body, understandingState)
+    const writeComment = db.transaction(() => {
+      const lessonId = getLessonId(slug)
+      db.prepare(
+        `
+          INSERT INTO lesson_comments (lesson_id, body, understanding_state)
+          VALUES (?, ?, ?)
+        `,
+      ).run(lessonId, body, understandingState)
 
-    db.prepare(
-      `
-        UPDATE lesson_progress
-        SET
-          last_viewed_at = ?,
-          updated_at = ?
-        WHERE lesson_id = ?
-      `,
-    ).run(now(), now(), lessonId)
+      db.prepare(
+        `
+          UPDATE lesson_progress
+          SET
+            last_viewed_at = ?,
+            updated_at = ?
+          WHERE lesson_id = ?
+        `,
+      ).run(now(), now(), lessonId)
+    })
+    writeComment()
 
     return getLessonDetail(slug)
   }
@@ -839,61 +845,63 @@ export const createCoachStore = (db: Database.Database, options: CoachStoreOptio
     quizId: number,
     answers: Array<{ questionId: number; selectedOption: string }>,
   ) => {
-    const questionRows = db.prepare(
-      `
-        SELECT id, prompt, options_json AS optionsJson, correct_option AS correctOption, explanation
-        FROM quiz_questions
-        WHERE quiz_id = ? AND retired_at IS NULL
-        ORDER BY order_index
-      `,
-    ).all(quizId) as Array<{
-      id: number
-      prompt: string
-      optionsJson: string
-      correctOption: string
-      explanation: string
-    }>
-
-    if (questionRows.length === 0) {
-      throw new Error('Quiz not found.')
-    }
-
-    // Match the UI contract before any learner writes. A partial or stale quiz
-    // is a rejected submission, not an attempt scored with implicit blanks.
-    if (answers.length !== questionRows.length) {
-      throw new Error('Answer every quiz question exactly once.')
-    }
-    const questionsById = new Map(questionRows.map((question) => [question.id, question]))
-    const answerMap = new Map<number, string>()
-    for (const answer of answers) {
-      const question = questionsById.get(answer.questionId)
-      if (!question || answerMap.has(answer.questionId)) {
-        throw new Error('Answer every quiz question exactly once.')
-      }
-      if (!parseJson<string[]>(question.optionsJson).includes(answer.selectedOption)) {
-        throw new Error('Select an offered option for every quiz question.')
-      }
-      answerMap.set(answer.questionId, answer.selectedOption)
-    }
-    const results = questionRows.map((question) => {
-      const selectedOption = answerMap.get(question.id) ?? ''
-      const isCorrect = selectedOption === question.correctOption
-
-      return {
-        questionId: question.id,
-        prompt: question.prompt,
-        selectedOption,
-        correctOption: question.correctOption,
-        explanation: question.explanation,
-        isCorrect,
-      }
-    })
-
-    const correctCount = results.filter((result) => result.isCorrect).length
-    const score = Math.round((correctCount / questionRows.length) * 100)
-    const timestamp = now()
-
+    // Read, validate and write in one snapshot, including when db:sync runs
+    // on another connection while this server is serving an older page.
     const writeAttempt = db.transaction(() => {
+      const questionRows = db.prepare(
+        `
+          SELECT id, prompt, options_json AS optionsJson, correct_option AS correctOption, explanation
+          FROM quiz_questions
+          WHERE quiz_id = ? AND retired_at IS NULL
+          ORDER BY order_index
+        `,
+      ).all(quizId) as Array<{
+        id: number
+        prompt: string
+        optionsJson: string
+        correctOption: string
+        explanation: string
+      }>
+
+      if (questionRows.length === 0) {
+        throw new Error('Quiz not found.')
+      }
+
+      // Match the UI contract before any learner writes. A partial or stale quiz
+      // is a rejected submission, not an attempt scored with implicit blanks.
+      if (answers.length !== questionRows.length) {
+        throw new Error('Answer every quiz question exactly once. The quiz may have changed; reload the lesson before retrying.')
+      }
+      const questionsById = new Map(questionRows.map((question) => [question.id, question]))
+      const answerMap = new Map<number, string>()
+      for (const answer of answers) {
+        const question = questionsById.get(answer.questionId)
+        if (!question || answerMap.has(answer.questionId)) {
+          throw new Error('Answer every quiz question exactly once. The quiz may have changed; reload the lesson before retrying.')
+        }
+        if (!parseJson<string[]>(question.optionsJson).includes(answer.selectedOption)) {
+          throw new Error('Select an offered option for every quiz question.')
+        }
+        answerMap.set(answer.questionId, answer.selectedOption)
+      }
+      const results = questionRows.map((question) => {
+        const selectedOption = answerMap.get(question.id) ?? ''
+        const isCorrect = selectedOption === question.correctOption
+
+        return {
+          questionId: question.id,
+          prompt: question.prompt,
+          selectedOption,
+          correctOption: question.correctOption,
+          explanation: question.explanation,
+          isCorrect,
+        }
+      })
+
+      const correctCount = results.filter((result) => result.isCorrect).length
+      const score = Math.round((correctCount / questionRows.length) * 100)
+      const timestamp = now()
+
       const attemptResult = db.prepare(
         `
           INSERT INTO quiz_attempts (quiz_id, score, total_questions, created_at)
@@ -955,16 +963,15 @@ export const createCoachStore = (db: Database.Database, options: CoachStoreOptio
         lastViewedAt: timestamp,
         updatedAt: timestamp,
       })
+      return {
+        score,
+        totalQuestions: questionRows.length,
+        correctCount,
+        results,
+      }
     })
 
-    writeAttempt()
-
-    return {
-      score,
-      totalQuestions: questionRows.length,
-      correctCount,
-      results,
-    }
+    return writeAttempt()
   }
 
   return {

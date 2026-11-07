@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
-import { spawn } from 'node:child_process'
+import { spawn, spawnSync } from 'node:child_process'
+import Database from 'better-sqlite3'
 import { once } from 'node:events'
 import { cpSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { createServer } from 'node:net'
@@ -68,7 +69,7 @@ async function startFixture(production = false) {
     await stop()
     throw error
   }
-  return { url: `http://127.0.0.1:${port}`, port, stop }
+  return { url: `http://127.0.0.1:${port}`, port, stop, directory: dir }
 }
 
 test('local API rejects untrusted browser requests without changing learner state', async (t) => {
@@ -192,4 +193,42 @@ test('production serves the root and client routes behind the same boundary', as
     assert.match(await response.text(), /Security fixture/)
   }
   assert.equal(await requestWithHost(server.url, 'attacker.invalid'), 403)
+})
+
+test('a live server rejects a stale quiz after a separate curriculum refresh and accepts the reloaded lesson', async (t) => {
+  const server = await startFixture()
+  t.after(server.stop)
+  const bootstrap = await (await fetch(`${server.url}/api/bootstrap`)).json()
+  const detailUrl = `${server.url}/api/lessons/${bootstrap.lessons[0].slug}`
+  const old = await (await fetch(detailUrl)).json()
+  const endpoint = `${server.url}/api/quizzes/${old.quiz.id}/submit`
+  const post = (detail: typeof old) => fetch(endpoint, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ answers: detail.quiz.questions.map((question: { id: number; options: string[] }) => ({
+      questionId: question.id, selectedOption: question.options[0],
+    })) }),
+  })
+  assert.equal((await post(old)).status, 200)
+  const refresh = spawnSync(process.execPath, ['--import', 'tsx', '--input-type=module', '-e', `
+    import { LESSON_SEEDS } from './server/content.ts';
+    import { syncSeedData } from './server/db.ts';
+    const question = LESSON_SEEDS[0].quizQuestions[0];
+    question.correctOption = question.options.find(option => option !== question.correctOption);
+    syncSeedData();
+  `], { cwd: server.directory, encoding: 'utf8', timeout: 10_000 })
+  assert.equal(refresh.status, 0, refresh.stderr)
+  const connection = new Database(join(server.directory, 'data/vibe-coach.sqlite'))
+  t.after(() => connection.close())
+  const snapshot = () => ['lesson_progress', 'lesson_comments', 'quiz_attempts', 'quiz_responses']
+    .map((table) => connection.prepare(`SELECT * FROM ${table} ORDER BY id`).all())
+  const before = snapshot()
+  const rejected = await post(old)
+  assert.equal(rejected.status, 400)
+  assert.match((await rejected.json()).error, /reload the lesson/)
+  assert.deepEqual(snapshot(), before)
+  const current = await (await fetch(detailUrl)).json()
+  assert.notEqual(current.quiz.questions[0].id, old.quiz.questions[0].id)
+  assert.equal((await post(current)).status, 200)
+  assert.equal((await (await fetch(detailUrl)).json()).quiz.recentAttempts.length, 2)
+  assert.deepEqual(connection.pragma('foreign_key_check'), [])
 })
