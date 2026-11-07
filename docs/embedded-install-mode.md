@@ -104,6 +104,8 @@ selected answers, correctness, and totals are not recalculated. Changes already
 made in place by an earlier engine version cannot be reconstructed automatically.
 
 A page opened before a grading change cannot submit the retired question IDs.
+For interrupted saves or refreshes, use the
+[recovery runbook](./curriculum-recovery.md) before retrying or reloading.
 If submission says the quiz may have changed, reload the lesson, review the new
 questions, and answer them again. Rejection does not save an attempt or change
 progress. Quiz validation and writes use one database transaction, and a failed

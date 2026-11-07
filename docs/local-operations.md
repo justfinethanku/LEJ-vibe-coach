@@ -32,6 +32,11 @@ with HTTP 403. The app has no remote-user authentication.
 
 ## Refresh curriculum
 
+For an interrupted refresh or learner save, follow
+[Recover curriculum and learner state](./curriculum-recovery.md) before retrying.
+It covers read-only inspection, unknown save outcomes, stale quizzes, and browser
+drafts that a reload would discard.
+
 1. Back up learner state before changing an existing curriculum.
 2. Edit `vibe-coach.project.ts`, the configured research directory, and
    `server/content.ts` as needed. In embedded mode, research the host repo.
