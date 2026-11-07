@@ -251,6 +251,7 @@
 }
 
 .content-card {
+  min-width: 0;
   padding: 1.4rem;
   border-radius: 1.35rem;
   background: rgba(255, 255, 255, 0.8);

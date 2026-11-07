@@ -54,6 +54,9 @@ export default function LessonWorkspace({ slug, active, focusRequest, onResearch
   const [lessonDetail, setLessonDetail] = useState<LessonDetail | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [announcement, setAnnouncement] = useState('')
+  const [quizNotice, setQuizNotice] = useState('')
+  const [loadAttempt, setLoadAttempt] = useState(0)
+  const [lessonLoading, setLessonLoading] = useState(true)
   const [progressStatus, setProgressStatus] = useState<LessonStatus>('not_started')
   const [confidence, setConfidence] = useState(1)
   const [commentBody, setCommentBody] = useState('')
@@ -67,6 +70,11 @@ export default function LessonWorkspace({ slug, active, focusRequest, onResearch
   const progressRevision = useRef(0)
   const contentHeading = useRef<HTMLHeadingElement>(null)
   const lastFocusRequest = useRef(0)
+  const loadPending = useRef(true)
+  const focusAfterRetry = useRef(false)
+  const quizHeading = useRef<HTMLHeadingElement>(null)
+  const quizQuestions = useRef<HTMLDivElement>(null)
+  const replacedFocus = useRef<Element | null>(null)
 
   useEffect(() => {
     mounted.current = true
@@ -76,31 +84,65 @@ export default function LessonWorkspace({ slug, active, focusRequest, onResearch
       setLessonDetail(detail)
       setProgressStatus(detail.lesson.status)
       setConfidence(detail.lesson.confidence)
+      if (focusAfterRetry.current) setAnnouncement('Lesson loaded.')
     }).catch((loadError) => {
-      if (!cancelled) setError(message(loadError, 'Failed to load lesson.'))
+      if (!cancelled) {
+        setAnnouncement('')
+        setError(message(loadError, 'Failed to load lesson.'))
+      }
+    }).finally(() => {
+      if (!cancelled) {
+        loadPending.current = false
+        setLessonLoading(false)
+      }
     })
     return () => { cancelled = true; mounted.current = false }
-  }, [slug])
+  }, [slug, loadAttempt])
 
   useEffect(() => {
-    if (active && lessonDetail && focusRequest > lastFocusRequest.current) {
+    if (active && lessonDetail && (focusRequest > lastFocusRequest.current || focusAfterRetry.current)) {
       contentHeading.current?.focus()
       lastFocusRequest.current = focusRequest
+      focusAfterRetry.current = false
     }
   }, [active, lessonDetail, focusRequest])
+
+  useEffect(() => {
+    const removed = replacedFocus.current
+    // Move only focus lost with the old question; never interrupt another field
+    // or bring a hidden lesson back from a research detour.
+    if (active && removed && !removed.isConnected && document.activeElement === document.body) {
+      quizHeading.current?.focus()
+    }
+    replacedFocus.current = null
+  }, [active, lessonDetail])
+
+  const retryLesson = () => {
+    if (loadPending.current) return
+    loadPending.current = true
+    focusAfterRetry.current = true
+    setLessonLoading(true)
+    setError(null)
+    setAnnouncement('Retrying lesson…')
+    setLoadAttempt((current) => current + 1)
+  }
 
   // Only an unchanged local draft adopts refreshed saved values. Quiz answers
   // and feedback belong to their exact set of question IDs, not just the slug.
   const publishDetail = (detail: LessonDetail, submittedProgressRevision: number) => {
-    if (lessonDetail && quizIdentity(lessonDetail) !== quizIdentity(detail)) {
+    const quizChanged = lessonDetail !== null && quizIdentity(lessonDetail) !== quizIdentity(detail)
+    if (quizChanged) {
+      replacedFocus.current = quizQuestions.current?.contains(document.activeElement) ? document.activeElement : null
       setQuizAnswers({})
       setQuizResult(null)
+      setQuizNotice('Quiz questions changed. Earlier answers and displayed results were cleared. Review the current questions before submitting again.')
     }
     setLessonDetail(detail)
     if (progressRevision.current === submittedProgressRevision) {
       setProgressStatus(detail.lesson.status)
       setConfidence(detail.lesson.confidence)
     }
+    return quizChanged
   }
 
   const runAction = async (kind: Action, write: () => Promise<string>) => {
@@ -172,11 +214,14 @@ export default function LessonWorkspace({ slug, active, focusRequest, onResearch
     const revision = progressRevision.current
     void runAction('quiz', async () => {
       const result = await submitQuiz(lessonDetail.quiz.id, answers)
-      const saved = `Quiz scored ${result.score}%. ${result.correctCount} of ${result.totalQuestions} correct.`
-      if (mounted.current) setQuizResult(result)
+      let saved = `Quiz scored ${result.score}%. ${result.correctCount} of ${result.totalQuestions} correct.`
+      if (mounted.current) {
+        setQuizResult(result)
+        setQuizNotice('')
+      }
       try {
         const detail = await fetchLessonDetail(slug)
-        if (mounted.current) publishDetail(detail, revision)
+        if (mounted.current && publishDetail(detail, revision)) saved = `Previous ${saved.toLowerCase()}`
       } catch (refreshError) {
         if (mounted.current) setError(`${saved} Lesson refresh failed: ${message(refreshError, 'Request failed.')}`)
       }
@@ -190,8 +235,13 @@ export default function LessonWorkspace({ slug, active, focusRequest, onResearch
   return (
     <div hidden={!active}>
       {error ? <div className="error-banner" role="alert">{error}</div> : null}
-      <p className="save-status" role="status" aria-atomic="true">{announcement}</p>
-      {!lessonDetail ? (error ? null : <PanelLoader label="Loading lesson..." />) : (
+      <p className="save-status" role="status" aria-atomic="true">{[announcement, quizNotice].filter(Boolean).join(' ')}</p>
+      {!lessonDetail && (error || loadAttempt > 0) ? (
+        <button className="secondary-button" type="button" aria-disabled={lessonLoading} onClick={retryLesson}>
+          Retry loading lesson
+        </button>
+      ) : null}
+      {!lessonDetail ? (error || loadAttempt > 0 ? null : <PanelLoader label="Loading lesson..." />) : (
         <div className="content-grid">
           <section className="content-card">
             <div className="lesson-header">
@@ -281,13 +331,13 @@ export default function LessonWorkspace({ slug, active, focusRequest, onResearch
 
             <article className="content-card">
               <div className="section-heading">
-                <h3>{lessonDetail.quiz.title}</h3>
+                <h3 ref={quizHeading} tabIndex={-1}>{lessonDetail.quiz.title}</h3>
                 <span className="muted">
                   Target score {lessonDetail.quiz.passingScore}%
                 </span>
               </div>
 
-              <div className="quiz-list">
+              <div className="quiz-list" ref={quizQuestions}>
                 {lessonDetail.quiz.questions.map((question) => (
                   <fieldset key={question.id} className="quiz-question">
                     <legend>
