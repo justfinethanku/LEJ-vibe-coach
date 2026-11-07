@@ -191,6 +191,11 @@ export const createCoachStore = (db: Database.Database, options: CoachStoreOptio
         ON lesson_comments (lesson_id, created_at DESC);
       CREATE INDEX IF NOT EXISTS quiz_attempts_by_quiz
         ON quiz_attempts (quiz_id, created_at DESC);
+
+      -- Bound refresh lookups to matching grading versions in retained history.
+      -- Include the retired-position range so the lookup stays covered.
+      CREATE INDEX IF NOT EXISTS quiz_questions_by_identity
+        ON quiz_questions (quiz_id, prompt, options_json, correct_option, order_index);
     `)
 
     // Upgrade existing learner databases in place; never rebuild history tables.
@@ -381,10 +386,11 @@ export const createCoachStore = (db: Database.Database, options: CoachStoreOptio
 
       // Match prompt, ordered choices and answer key so an old page cannot submit
       // against changed grading. Retired rows preserve their original answers.
+      // Already-negative positions are historical; leave those rows untouched.
       const retireQuestions = db.prepare(`
         UPDATE quiz_questions
         SET order_index = -id, retired_at = COALESCE(retired_at, ?)
-        WHERE quiz_id = ?
+        WHERE quiz_id = ? AND order_index > 0
       `)
       const findQuestion = db.prepare(`
         SELECT id FROM quiz_questions
