@@ -498,7 +498,9 @@ export const createCoachStore = (db: Database.Database, options: CoachStoreOptio
     sync()
   }
 
-  const getBootstrapData = () => {
+  // Each response combines several queries. Hold one read snapshot so a
+  // concurrent db:sync or learner write cannot mix versions within the payload.
+  const getBootstrapData = db.transaction(() => {
     const project = db.prepare(
       `
         SELECT slug, title, description
@@ -593,9 +595,9 @@ export const createCoachStore = (db: Database.Database, options: CoachStoreOptio
       lessons,
       researchDocuments,
     }
-  }
+  })
 
-  const getLessonDetail = (slug: string) => {
+  const getLessonDetail = db.transaction((slug: string) => {
     const lesson = db.prepare(
       `
         SELECT
@@ -755,7 +757,7 @@ export const createCoachStore = (db: Database.Database, options: CoachStoreOptio
       comments,
       relatedResearch,
     }
-  }
+  })
 
   const getResearchDocumentDetail = (slug: string) => {
     const document = db.prepare(
